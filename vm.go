@@ -152,6 +152,15 @@ func newGameState(gameSystem *GameSystemTemplateV2) *GameState {
 							buffValue := result.MustReadInt()
 							totalBuffValue += int64(buffValue)
 							fmt.Printf("[Buff] %s 对 %s 增加 %d (来源: %s)\n", buff.Name, name, buffValue, buff.Source)
+
+							if detail != nil {
+								detail.ExprSuffix = ","
+								if detail.Text == "" {
+									detail.Text = fmt.Sprintf("%s%d", buff.Name, buffValue)
+								} else {
+									detail.Text += fmt.Sprintf("+%s%d", buff.Name, buffValue)
+								}
+							}
 						}
 					}
 				}
@@ -161,13 +170,8 @@ func newGameState(gameSystem *GameSystemTemplateV2) *GameState {
 					originalValue := curVal.MustReadInt()
 					newValue := int64(originalValue) + totalBuffValue
 					curVal = ds.NewIntVal(ds.IntType(newValue))
+					detail.Ret = curVal
 					fmt.Printf("[Buff] %s 最终值: %d (原始值 %d + buff加成 %d)\n", name, newValue, originalValue, totalBuffValue)
-
-					if detail != nil {
-						fmt.Println("???", name, detail)
-						detail.Ret = curVal
-						detail.Text = "buff+" + strconv.FormatInt(totalBuffValue, 10)
-					}
 				}
 			}
 		}
@@ -178,20 +182,6 @@ func newGameState(gameSystem *GameSystemTemplateV2) *GameState {
 	// _ = vm.RegCustomDice(`E(\d+)`, func(ctx *ds.Context, groups []string) *ds.VMValue {
 	// 	return ds.NewIntVal(2)
 	// })
-
-	// 原生值，目前不干涉
-	// vm.GlobalValueLoadFunc = func(varname string) *ds.VMValue {
-	// 	nameForLoad := varname
-	// 	// 别名转换
-	// 	if gameState.SystemTemplate != nil {
-	// 		nameForLoad = gameState.SystemTemplate.GetAlias(varname)
-	// 	}
-
-	// 	if val, ok := attrs.Load(nameForLoad); ok {
-	// 		return val
-	// 	}
-	// 	return nil
-	// }
 
 	vm.GlobalValueLoadOverwriteFunc = func(nameOrigin string, curVal *ds.VMValue) *ds.VMValue {
 		// 如果已经拿到，直接返回
@@ -229,11 +219,21 @@ func newGameState(gameSystem *GameSystemTemplateV2) *GameState {
 		ID:         "physical_boost",
 		Keys:       []string{},
 		KeyPattern: "力量|体型", // 匹配力量或体型
-		Name:       "体质强化",
+		Name:       "体型强化",
 		Add:        "50", // 固定加5
 		Source:     "魔法药剂",
 	}
 	gameState.BuffManager.AddBuff(testBuff2)
+
+	testBuff3 := &Buff{
+		ID:         "physical_boost2",
+		Keys:       []string{},
+		KeyPattern: "力量|体型", // 匹配力量或体型
+		Name:       "临时加值",
+		Add:        "20", // 固定加5
+		Source:     "临时加值",
+	}
+	gameState.BuffManager.AddBuff(testBuff3)
 
 	fmt.Println("[BuffManager] 已添加测试buff:")
 	for _, buff := range gameState.BuffManager.ListAllBuffs() {
