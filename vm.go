@@ -139,33 +139,35 @@ func newGameState(gameSystem *GameSystemTemplateV2) *GameState {
 		curVal = doCompute(curVal)
 
 		// 获取影响当前属性的所有buff
-		buffs := gameState.BuffManager.GetBuffsForAttr(name)
-		if len(buffs) > 0 {
-			// 计算buff加成
-			totalBuffValue := int64(0)
-			for _, buff := range buffs {
-				if buff.Add != "" {
-					// 执行buff的add表达式
-					result, _ := vm.RunExpr(buff.Add, false)
-					if result.TypeId == ds.VMTypeInt {
-						buffValue := result.MustReadInt()
-						totalBuffValue += int64(buffValue)
-						fmt.Printf("[Buff] %s 对 %s 增加 %d (来源: %s)\n", buff.Name, name, buffValue, buff.Source)
+		if curVal.TypeId == ds.VMTypeInt {
+			buffs := gameState.BuffManager.GetBuffsForAttr(name)
+			if len(buffs) > 0 {
+				// 计算buff加成
+				totalBuffValue := int64(0)
+				for _, buff := range buffs {
+					if buff.Add != "" {
+						// 执行buff的add表达式
+						result, _ := vm.RunExpr(buff.Add, false)
+						if result.TypeId == ds.VMTypeInt {
+							buffValue := result.MustReadInt()
+							totalBuffValue += int64(buffValue)
+							fmt.Printf("[Buff] %s 对 %s 增加 %d (来源: %s)\n", buff.Name, name, buffValue, buff.Source)
+						}
 					}
 				}
-			}
 
-			// 将buff加成应用到原始值
-			if totalBuffValue != 0 && curVal.TypeId == ds.VMTypeInt {
-				originalValue := curVal.MustReadInt()
-				newValue := int64(originalValue) + totalBuffValue
-				curVal = ds.NewIntVal(ds.IntType(newValue))
-				fmt.Printf("[Buff] %s 最终值: %d (原始值 %d + buff加成 %d)\n", name, newValue, originalValue, totalBuffValue)
+				// 将buff加成应用到原始值
+				if totalBuffValue != 0 && curVal.TypeId == ds.VMTypeInt {
+					originalValue := curVal.MustReadInt()
+					newValue := int64(originalValue) + totalBuffValue
+					curVal = ds.NewIntVal(ds.IntType(newValue))
+					fmt.Printf("[Buff] %s 最终值: %d (原始值 %d + buff加成 %d)\n", name, newValue, originalValue, totalBuffValue)
 
-				if detail != nil {
-					fmt.Println("???", name, detail)
-					detail.Ret = curVal
-					detail.Text = "buff+" + strconv.FormatInt(totalBuffValue, 10)
+					if detail != nil {
+						fmt.Println("???", name, detail)
+						detail.Ret = curVal
+						detail.Text = "buff+" + strconv.FormatInt(totalBuffValue, 10)
+					}
 				}
 			}
 		}
@@ -197,26 +199,7 @@ func newGameState(gameSystem *GameSystemTemplateV2) *GameState {
 			return curVal
 		}
 
-		// 尝试变量读取
-		name := nameOrigin
-
-		// 别名转换
-		if gameState.SystemTemplate != nil {
-			name = gameState.SystemTemplate.GetAlias(name)
-		}
-
-		// 属性读取
-		if val, ok := attrs.Load(name); ok {
-			return val
-		}
-
-		// 系统默认值
-		if gameState.SystemTemplate != nil {
-			v2n, _, _, exists2 := gameState.SystemTemplate.GetDefaultValue(name)
-			if exists2 {
-				return v2n
-			}
-		}
+		curVal = getAttrByName(nameOrigin)
 
 		// TODO: 规则模板中的读取拦截
 		// TODO: buff机制怎么实现？
