@@ -4,7 +4,7 @@ go 1.24.6
 
 require (
 	github.com/peterh/liner v1.2.2
-	github.com/sealdice/dicescript v0.0.0-20250818175549-c99a1c4d45f7
+	github.com/sealdice/dicescript v0.0.0-20250831112511-4cdb98de11d7
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -14,4 +14,4 @@ require (
 	golang.org/x/sys v0.12.0 // indirect
 )
 
-replace github.com/sealdice/dicescript => D:\codes\dicescript
+// replace github.com/sealdice/dicescript => D:\codes\dicescript
