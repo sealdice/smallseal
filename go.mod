@@ -13,3 +13,5 @@ require (
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 )
+
+replace github.com/sealdice/dicescript => D:\codes\dicescript

@@ -32,6 +32,8 @@ type Attrs struct {
 	Defaults         map[string]int    `yaml:"defaults"`         // 默认值
 	DefaultsComputed map[string]string `yaml:"defaultsComputed"` // 计算默认值
 	DetailOverwrite  map[string]string `yaml:"detailOverwrite"`  // 详情重写
+
+	DefaultsComputedReal map[string]*ds.VMValue `json:"-" yaml:"-"`
 }
 
 // Alias 别名配置
@@ -143,6 +145,14 @@ func (t *GameSystemTemplateV2) Init() {
 		}
 		t.AliasMap.Store(strings.ToLower(k), k)
 	}
+
+	// 处理 DefaultsComputedReal
+	t.Attrs.DefaultsComputedReal = make(map[string]*ds.VMValue)
+	if t.Attrs.DefaultsComputed != nil {
+		for k, v := range t.Attrs.DefaultsComputed {
+			t.Attrs.DefaultsComputedReal[k] = ds.NewComputedVal(v)
+		}
+	}
 }
 
 // "github.com/go-creed/sat"
@@ -172,9 +182,9 @@ func (t *GameSystemTemplateV2) GetDefaultValue(varname string) (*ds.VMValue, str
 	var detail string
 
 	// 需要优化成提前编译computed，这样直接载入就行
-	// if expr, exists := t.Attrs.DefaultsComputed[varname]; exists {
-	// 	return ds.NewIntVal(0), "", true, true
-	// }
+	if computed, exists := t.Attrs.DefaultsComputedReal[varname]; exists {
+		return computed, "", true, true
+	}
 
 	// 具体语句
 	if val, exists := t.Attrs.Defaults[varname]; exists {
