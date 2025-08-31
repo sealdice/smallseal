@@ -1,4 +1,4 @@
-package main
+package dice
 
 import (
 	"encoding/json"
@@ -9,6 +9,8 @@ import (
 
 	ds "github.com/sealdice/dicescript"
 	"gopkg.in/yaml.v3"
+
+	"smallseal/utils"
 )
 
 // GameSystemTemplateV2 新版本的游戏系统模板结构
@@ -24,7 +26,8 @@ type GameSystemTemplateV2 struct {
 	Alias       Alias    `yaml:"alias"`       // 别名配置
 	Commands    Commands `yaml:"commands"`    // 命令配置
 
-	AliasMap *SyncMap[string, string] `json:"-" yaml:"-"` // 别名/同义词
+	AliasMap          *utils.SyncMap[string, string]                                                                                                            `json:"-" yaml:"-"` // 别名/同义词
+	HookValueLoadPost func(ctx *ds.Context, name string, curVal *ds.VMValue, doCompute func(curVal *ds.VMValue) *ds.VMValue, detail *ds.BufferSpan) *ds.VMValue `json:"-" yaml:"-"`
 }
 
 // Attrs 属性配置
@@ -137,7 +140,7 @@ func SaveGameSystemTemplate(template *GameSystemTemplateV2, filename string) err
 }
 
 func (t *GameSystemTemplateV2) Init() {
-	t.AliasMap = new(SyncMap[string, string])
+	t.AliasMap = new(utils.SyncMap[string, string])
 	alias := t.Alias
 	for k, v := range alias {
 		for _, i := range v {
@@ -178,6 +181,7 @@ func (t *GameSystemTemplateV2) GetAlias(varname string) string {
 }
 
 // 默认值获取搞得太复杂了
+// 四个返回值 val, detail, computed, exists
 func (t *GameSystemTemplateV2) GetDefaultValue(varname string) (*ds.VMValue, string, bool, bool) {
 	var detail string
 
@@ -193,32 +197,4 @@ func (t *GameSystemTemplateV2) GetDefaultValue(varname string) (*ds.VMValue, str
 
 	return nil, detail, false, false
 
-}
-
-// GetDefaultValueEx0 获取默认值 四个返回值 val, detail, computed, exists
-func (t *GameSystemTemplateV2) GetDefaultValueEx0(ctx *GameState, varname string) (*ds.VMValue, string, bool, bool) {
-	name := t.GetAlias(varname)
-	var detail string
-
-	// 先计算computed
-	if expr, exists := t.Attrs.DefaultsComputed[name]; exists {
-		ctx.SystemTemplate = t
-		// 也许有点依赖这个东西？有更好的方式吗？可以更加全局的去加载吗（比如和vm创建伴生加载）？
-		ctx.VM.Run(t.PreloadCode)
-		ctx.VM.Run(expr)
-
-		// if r.vm.Error == nil {
-		// 	detail = r.vm.GetDetailText()
-		// 	return &r.VMValue, detail, r.vm.IsCalculateExists() || r.vm.IsComputedLoaded, true
-		// } else {
-		// 	return ds.NewStrVal("代码:" + expr + "\n" + "报错:" + r.vm.Error.Error()), "", true, true
-		// }
-	}
-
-	// if val, exists := t.Attrs.Defaults[name]; exists {
-	// 	return ds.NewIntVal(ds.IntType(val)), detail, false, true
-	// }
-
-	// TODO: 以空值填充，这是vm v1的行为，未来需要再次评估其合理性
-	return ds.NewIntVal(0), detail, false, false
 }

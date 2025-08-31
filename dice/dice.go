@@ -1,0 +1,165 @@
+package dice
+
+import (
+	"sync/atomic"
+	"time"
+
+	"smallseal/dice/attrs"
+	"smallseal/dice/types"
+	"smallseal/utils"
+)
+
+type Dice struct {
+	AttrsManager *attrs.AttrsManager
+	groupMap     utils.SyncMap[string, *types.GroupInfo]
+	gameSystem   utils.SyncMap[string, *GameSystemTemplateV2]
+
+	ExtList []*types.ExtInfo
+
+	curCommandID atomic.Int64
+
+	Config struct {
+		CommandPrefix []string
+	}
+}
+
+func NewDice() *Dice {
+	d := &Dice{
+		AttrsManager: &attrs.AttrsManager{},
+	}
+
+	d.AttrsManager.Init()
+	d.Config.CommandPrefix = []string{"."}
+
+	coc7, err := LoadGameSystemTemplate("./coc7.yaml")
+	if err != nil {
+		panic(err)
+	}
+	d.gameSystem.Store(coc7.Name, coc7)
+
+	RegisterBuiltinExtCore(d)
+
+	return d
+}
+
+func (d *Dice) getNextCommandID() int64 {
+	return d.curCommandID.Add(1)
+}
+
+func (d *Dice) GroupLoad(groupId string) (*types.GroupInfo, bool) {
+	return d.groupMap.Load(groupId)
+}
+
+func (d *Dice) GroupStore(groupId string, groupInfo *types.GroupInfo) {
+	d.groupMap.Store(groupId, groupInfo)
+}
+
+// func (d *Dice) GroupNew(groupId string) {
+// 	groupInfo := &types.GroupInfo{
+// 		GroupID: groupId,
+// 	}
+// 	d.groupMap.Store(groupId, groupInfo)
+// }
+
+func (d *Dice) Execute(msg *types.Message) {
+	mctx := &types.MsgContext{}
+	mctx.MessageType = msg.MessageType
+	// mctx.IsPrivate = mctx.MessageType == "private"
+
+	// 处理消息段，如果 2.0 要完全抛弃依赖 Message.Message 的字符串解析，把这里删掉
+	msg.Message = ""
+	for _, elem := range msg.Segment {
+		// 类型断言
+		if e, ok := elem.(*types.TextElement); ok {
+			msg.Message += e.Content
+		}
+	}
+
+	if msg.MessageType != "group" && msg.MessageType != "private" {
+		return
+	}
+
+	// 处理命令
+	groupInfo, ok := d.GroupLoad(msg.GroupID)
+
+	if !ok {
+		groupInfo = &types.GroupInfo{
+			GroupID: msg.GroupID,
+			System:  "coc7",
+		}
+
+		for _, ext := range d.ExtList {
+			groupInfo.ActivatedExtList = append(groupInfo.ActivatedExtList, ext)
+		}
+		d.GroupStore(msg.GroupID, groupInfo)
+	}
+
+	mctx.Group = groupInfo
+	mctx.Player = &types.GroupPlayerInfo{
+		UserID: msg.Sender.UserID,
+	}
+
+	groupInfo.UpdatedAtTime = time.Now().Unix()
+
+	cmdLst := []string{"r", "st"}
+	platformPrefix := "QQ"
+	cmdArgs := types.CommandParse(msg.Message, cmdLst, d.Config.CommandPrefix, platformPrefix, false)
+
+	if cmdArgs != nil {
+		mctx.CommandID = d.getNextCommandID()
+	}
+
+	// 收到群 test(1111) 内 XX(222) 的消息: 好看 (1232611291)
+	// if msg.MessageType == "group" {
+	// 	// TODO(Szzrain):  需要优化的写法，不应根据 CommandID 来判断是否是指令，而应该根据 cmdArgs 是否 match 到指令来判断
+	// 	if mctx.CommandID != 0 {
+	// 		// 关闭状态下，如果被@，且是第一个被@的，那么视为开启
+	// 		if !mctx.IsCurGroupBotOn && cmdArgs.AmIBeMentionedFirst {
+	// 			mctx.IsCurGroupBotOn = true
+	// 		}
+
+	// 		log.Infof("收到群(%s)内<%s>(%s)的指令: %s", msg.GroupID, msg.Sender.Nickname, msg.Sender.UserID, msg.Message)
+	// 	} else {
+	// 		doLog := true
+	// 		if d.Config.OnlyLogCommandInGroup {
+	// 			// 检查上级选项
+	// 			doLog = false
+	// 		}
+	// 		if doLog {
+	// 		}
+	// 		if doLog {
+	// 			log.Infof("收到群(%s)内<%s>(%s)的消息: %s", msg.GroupID, msg.Sender.Nickname, msg.Sender.UserID, msg.Message)
+	// 			// fmt.Printf("消息长度 %v 内容 %v \n", len(msg.Message), []byte(msg.Message))
+	// 		}
+	// 	}
+	// }
+
+	// // Note(Szzrain): 这里的代码本来在敏感词检测下面，会产生预期之外的行为，所以挪到这里
+	// if msg.MessageType == "private" {
+	// 	// TODO(Szzrain): 需要优化的写法，不应根据 CommandID 来判断是否是指令，而应该根据 cmdArgs 是否 match 到指令来判断，同上
+	// 	if mctx.CommandID != 0 {
+	// 		log.Infof("收到<%s>(%s)的私聊指令: %s", msg.Sender.Nickname, msg.Sender.UserID, msg.Message)
+	// 	} else if !d.Config.OnlyLogCommandInPrivate {
+	// 		log.Infof("收到<%s>(%s)的私聊消息: %s", msg.Sender.Nickname, msg.Sender.UserID, msg.Message)
+	// 	}
+	// }
+
+	// Note(Szzrain): 赋值临时变量，不然有些地方没法用
+	// SetTempVars(mctx, msg.Sender.Nickname)
+
+	for _, _i := range mctx.Group.ActivatedExtList {
+		i := _i // 保留引用(我记得从go的什么版本开始不用如此处理了)
+		if i.OnNotCommandReceived != nil {
+			i.OnNotCommandReceived(mctx, msg)
+		}
+		if i.OnCommandReceived != nil && cmdArgs != nil {
+			i.OnCommandReceived(mctx, msg, cmdArgs)
+		}
+
+		if cmdArgs != nil {
+			if cmd, ok := i.CmdMap[cmdArgs.Command]; ok {
+				cmd.Solve(mctx, msg, cmdArgs)
+			}
+		}
+	}
+}

@@ -1,4 +1,4 @@
-package main
+package dice
 
 import (
 	"fmt"
@@ -6,8 +6,7 @@ import (
 	ds "github.com/sealdice/dicescript"
 )
 
-func RegisterDebugFuncs(game *GameState) {
-	vm := game.VM
+func RegisterDebugFuncs(vm *ds.Context) {
 	vm.StoreName("toJSON", ds.NewNativeFunctionVal(&ds.NativeFunctionData{
 		Name:   "toJSON",
 		Params: []string{"value"},

@@ -7,6 +7,9 @@ import (
 	"strings"
 
 	"github.com/peterh/liner"
+
+	"smallseal/dice"
+	"smallseal/dice/types"
 )
 
 var (
@@ -14,14 +17,7 @@ var (
 )
 
 func main() {
-	sysTmpl, err := LoadGameSystemTemplate("./coc7.yaml")
-	if err != nil {
-		fmt.Printf("加载游戏系统模板时出错: %v\n", err)
-		return
-	}
-
-	game := newGameState(sysTmpl)
-	vm := game.VM
+	d := dice.NewDice()
 
 	line := liner.NewLiner()
 	defer line.Close()
@@ -46,19 +42,34 @@ func main() {
 			}
 			line.AppendHistory(text)
 
-			err := vm.Run(text)
-			// fmt.Println(vm.GetAsmText())
-			if err != nil {
-				fmt.Printf("错误: %s\n", err.Error())
-			} else {
-				rest := vm.RestInput
-				if rest != "" {
-					rest = fmt.Sprintf(" 剩余文本: %s", rest)
-				}
-				fmt.Printf("过程: %s\n", vm.GetDetailText())
-				fmt.Printf("结果: %s%s\n", vm.Ret.ToString(), rest)
-				fmt.Printf("栈顶: %d 层数:%d 算力: %d\n", vm.StackTop(), vm.Depth(), vm.NumOpCount)
-			}
+			d.Execute(&types.Message{
+				MessageType: "group",
+				GroupID:     "1000",
+
+				Sender: types.SenderBase{
+					UserID:   "123",
+					Nickname: "seal",
+				},
+				Segment: []types.IMessageElement{
+					&types.TextElement{
+						Content: text,
+					},
+				},
+			})
+
+			// err := vm.Run(text)
+			// // fmt.Println(vm.GetAsmText())
+			// if err != nil {
+			// 	fmt.Printf("错误: %s\n", err.Error())
+			// } else {
+			// 	rest := vm.RestInput
+			// 	if rest != "" {
+			// 		rest = fmt.Sprintf(" 剩余文本: %s", rest)
+			// 	}
+			// 	fmt.Printf("过程: %s\n", vm.GetDetailText())
+			// 	fmt.Printf("结果: %s%s\n", vm.Ret.ToString(), rest)
+			// 	fmt.Printf("栈顶: %d 层数:%d 算力: %d\n", vm.StackTop(), vm.Depth(), vm.NumOpCount)
+			// }
 
 		} else if err == liner.ErrPromptAborted {
 			if ccTimes >= 0 {
