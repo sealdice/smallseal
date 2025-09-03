@@ -1,17 +1,18 @@
-package dice
+package types
+
+// 这可不妙，后续想想怎么拆这玩意
 
 import (
 	"fmt"
 	"regexp"
 	"strconv"
 
-	"smallseal/dice/attrs"
-	"smallseal/dice/types"
-
 	ds "github.com/sealdice/dicescript"
+
+	"smallseal/dice/attrs"
 )
 
-func newVM(msgInfo *types.MsgContext, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2) *ds.Context {
+func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2) *ds.Context {
 	vm := ds.NewVM()
 
 	vm.Config.EnableDiceWoD = true
@@ -31,7 +32,7 @@ func newVM(msgInfo *types.MsgContext, am *attrs.AttrsManager, gameSystem *GameSy
 	vm.Config.OpCountLimit = 30000
 
 	getAttr := func() (*attrs.AttributesItem, error) {
-		return am.Load(msgInfo.Group.GroupID, msgInfo.Player.UserID)
+		return am.Load(groupId, userId)
 	}
 
 	getAttrByName := func(nameOrigin string) *ds.VMValue {

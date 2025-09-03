@@ -1,10 +1,10 @@
 package types
 
 import (
-	"smallseal/utils"
-
 	"github.com/sealdice/dicescript"
 	"golang.org/x/time/rate"
+
+	"smallseal/utils"
 )
 
 // GroupPlayerInfoBase 群内玩家信息
@@ -12,7 +12,7 @@ type GroupPlayerInfo struct {
 	// 补充这个字段，从而保证包含主键ID
 	ID     uint   `gorm:"column:id;primaryKey;autoIncrement"                                                               jsbind:"-"      yaml:"-"`    // 主键ID字段，自增
 	Name   string `gorm:"column:name"                                                                                      jsbind:"name"   yaml:"name"` // 玩家昵称
-	UserID string `gorm:"column:user_id;index:idx_group_player_info_user_id; uniqueIndex:idx_group_player_info_group_user" jsbind:"userId" yaml:"userId"`
+	UserId string `gorm:"column:user_id;index:idx_group_player_info_user_id; uniqueIndex:idx_group_player_info_group_user" jsbind:"userId" yaml:"userId"`
 	// 非数据库信息：是否在群内
 	InGroup         bool  `gorm:"-"                        yaml:"inGroup"`                                  // 是否在群内，有时一个人走了，信息还暂时残留
 	LastCommandTime int64 `gorm:"column:last_command_time" jsbind:"lastCommandTime" yaml:"lastCommandTime"` // 上次发送指令时间
@@ -47,7 +47,7 @@ type GroupInfo struct {
 	ExtListSnapshot  []string                                 `json:"-"                yaml:"-"`                                   // 存放当前激活的扩展表，无论其是否存在，用于处理插件重载后优先级混乱的问题
 	Players          *utils.SyncMap[string, *GroupPlayerInfo] `json:"-"                yaml:"-"`                                   // 群员角色数据
 
-	GroupID         string                       `jsbind:"groupId"       json:"groupId"      yaml:"groupId"`
+	GroupId         string                       `jsbind:"groupId"       json:"groupId"      yaml:"groupId"`
 	GuildID         string                       `jsbind:"guildId"       json:"guildId"      yaml:"guildId"`
 	ChannelID       string                       `jsbind:"channelId"     json:"channelId"    yaml:"channelId"`
 	GroupName       string                       `jsbind:"groupName"     json:"groupName"    yaml:"groupName"`

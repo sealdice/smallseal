@@ -1,4 +1,4 @@
-package dice
+package exts
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"smallseal/dice/types"
 )
 
-func RegisterBuiltinExtCore(dice *Dice) {
+func RegisterBuiltinExtCore(dice types.DiceLike) {
 	theExt := &types.ExtInfo{
 		Name:       "core",
 		Version:    "1.0.0",
@@ -43,9 +43,7 @@ func RegisterBuiltinExtCore(dice *Dice) {
 				}
 			}
 
-			tmpl, _ := dice.gameSystem.Load(ctx.Group.System)
-			vm := newVM(ctx, dice.AttrsManager, tmpl)
-
+			vm := ctx.GetVM()
 			expr := cmdArgs.CleanArgs
 
 			if expr == "" {

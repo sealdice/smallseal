@@ -1,18 +1,20 @@
 package dice
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
 	"smallseal/dice/attrs"
+	"smallseal/dice/exts"
 	"smallseal/dice/types"
 	"smallseal/utils"
 )
 
 type Dice struct {
-	AttrsManager *attrs.AttrsManager
+	attrsManager *attrs.AttrsManager
 	groupMap     utils.SyncMap[string, *types.GroupInfo]
-	gameSystem   utils.SyncMap[string, *GameSystemTemplateV2]
+	gameSystem   utils.SyncMap[string, *types.GameSystemTemplateV2]
 
 	ExtList []*types.ExtInfo
 
@@ -25,19 +27,19 @@ type Dice struct {
 
 func NewDice() *Dice {
 	d := &Dice{
-		AttrsManager: &attrs.AttrsManager{},
+		attrsManager: &attrs.AttrsManager{},
 	}
 
-	d.AttrsManager.Init()
+	d.attrsManager.Init()
 	d.Config.CommandPrefix = []string{"."}
 
-	coc7, err := LoadGameSystemTemplate("./coc7.yaml")
+	coc7, err := types.LoadGameSystemTemplate("./coc7.yaml")
 	if err != nil {
 		panic(err)
 	}
 	d.gameSystem.Store(coc7.Name, coc7)
 
-	RegisterBuiltinExtCore(d)
+	exts.RegisterBuiltinExtCore(d)
 
 	return d
 }
@@ -62,19 +64,13 @@ func (d *Dice) GroupStore(groupId string, groupInfo *types.GroupInfo) {
 // }
 
 func (d *Dice) Execute(msg *types.Message) {
-	mctx := &types.MsgContext{}
-	mctx.MessageType = msg.MessageType
+	mctx := &types.MsgContext{Dice: d}
+	mctx.AttrsManager = d.attrsManager
+
+	// mctx.MessageType = msg.MessageType
 	// mctx.IsPrivate = mctx.MessageType == "private"
 
-	// 处理消息段，如果 2.0 要完全抛弃依赖 Message.Message 的字符串解析，把这里删掉
-	msg.Message = ""
-	for _, elem := range msg.Segment {
-		// 类型断言
-		if e, ok := elem.(*types.TextElement); ok {
-			msg.Message += e.Content
-		}
-	}
-
+	msg.Message = msg.Segment.ToText()
 	if msg.MessageType != "group" && msg.MessageType != "private" {
 		return
 	}
@@ -84,7 +80,7 @@ func (d *Dice) Execute(msg *types.Message) {
 
 	if !ok {
 		groupInfo = &types.GroupInfo{
-			GroupID: msg.GroupID,
+			GroupId: msg.GroupID,
 			System:  "coc7",
 		}
 
@@ -94,9 +90,10 @@ func (d *Dice) Execute(msg *types.Message) {
 		d.GroupStore(msg.GroupID, groupInfo)
 	}
 
+	mctx.GameSystem, _ = d.gameSystem.Load(groupInfo.System)
 	mctx.Group = groupInfo
 	mctx.Player = &types.GroupPlayerInfo{
-		UserID: msg.Sender.UserID,
+		UserId: msg.Sender.UserID,
 	}
 
 	groupInfo.UpdatedAtTime = time.Now().Unix()
@@ -162,4 +159,10 @@ func (d *Dice) Execute(msg *types.Message) {
 			}
 		}
 	}
+}
+
+func (d *Dice) SendReply(msg *types.MsgToReply) {
+	// TODO: 整几个 delegate 在这等着，先跑钩子，再跑delegate，adapter们都去注册delegate
+	text := msg.Segment.ToText()
+	fmt.Printf("%s\n", text)
 }

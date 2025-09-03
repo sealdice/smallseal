@@ -1,4 +1,6 @@
-package dice
+package types
+
+// 放这里不太合适，不过必要时还能继续拆
 
 import (
 	"encoding/json"

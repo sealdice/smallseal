@@ -1,6 +1,8 @@
 package types
 
-import "sync"
+import (
+	"sync"
+)
 
 type CmdExecuteResult struct {
 	Matched  bool // 是否是指令
