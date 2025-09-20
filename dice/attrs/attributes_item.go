@@ -4,33 +4,26 @@ import (
 	"time"
 
 	ds "github.com/sealdice/dicescript"
-
-	"smallseal/dice/attrs/attrs_io"
 )
 
 // AttributesItem 这是一个人物卡对象
 type AttributesItem struct {
-	ID               string
-	valueMap         *ds.ValueMap // SyncMap[string, *ds.VMValue] 这种类型更好吗？我得确认一下js兼容性
-	LastModifiedTime int64        // 上次修改时间
-	LastUsedTime     int64        // 上次使用时间
-	IsSaved          bool
-	Name             string
-	SheetType        string
-}
+	ID        string // 如果是群内，那么是类似 QQ-Group:12345-QQ:678910，群外是nanoid
+	AttrsType string `json:"attrsType"` // 分为: 角色(character)、组内用户(group_user)、群组(group)、用户(user)
+	IsHidden  bool   `json:"isHidden"`  // 隐藏的卡片不出现在 pc list 中
 
-func (i *AttributesItem) SaveToDB(db any) {
-	// 使用事务写入
-	rawData, err := ds.NewDictVal(i.valueMap).V().ToJSON()
-	if err != nil {
-		return
-	}
-	err = attrs_io.AttrsPutById(db, i.ID, rawData, i.Name, i.SheetType)
-	if err != nil {
-		// logger.M().Error("保存数据失败", err.Error())
-		return
-	}
-	i.IsSaved = true
+	Data     []byte       `json:"data"` // 序列化后的卡数据
+	valueMap *ds.ValueMap // SyncMap[string, *ds.VMValue] 这种类型更好吗？我得确认一下js兼容性
+
+	// 角色卡专用
+	Name      string `json:"name"`      // 卡片名称
+	SheetType string `json:"sheetType"` // 卡片类型，如dnd5e coc7
+	OwnerId   string `json:"ownerId"`   // 若有明确归属，就是对应的UniformID
+
+	// 其他
+	LastModifiedTime int64 // 上次修改时间
+	LastUsedTime     int64 // 上次使用时间
+	IsSaved          bool
 }
 
 func (i *AttributesItem) Load(name string) *ds.VMValue {
@@ -113,4 +106,8 @@ func (i *AttributesItem) SetSheetType(system string) {
 
 func (i *AttributesItem) Len() int {
 	return i.valueMap.Length()
+}
+
+func (i *AttributesItem) IsDataExists() bool {
+	return len(i.Data) > 0
 }

@@ -28,6 +28,8 @@ func ReplyRaw(ctx *types.MsgContext, msg *types.Message, text string, flag strin
 	}
 
 	ctx.Dice.SendReply(&types.MsgToReply{
+		AdapterId: msg.Platform,
+		CommandId: ctx.CommandId,
 		Sender: types.MsgSenderInfo{
 			Platform: msg.Platform,
 			GroupId:  msg.GroupID,

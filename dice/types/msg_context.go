@@ -8,7 +8,8 @@ import (
 )
 
 type MsgContext struct {
-	CommandID int64
+	CommandId int64
+	AdapterId string
 
 	IsCurGroupBotOn bool
 	IsPrivate       bool
@@ -22,6 +23,8 @@ type MsgContext struct {
 
 	AttrsManager *attrs.AttrsManager
 	GameSystem   *GameSystemTemplateV2
+
+	TextTemplateMap TextTemplateWithWeightDict
 
 	vm   *ds.Context
 	Dice DiceLike

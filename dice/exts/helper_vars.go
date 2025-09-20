@@ -4,11 +4,15 @@ package exts
 // 这两个helper文件基本上出于可移植性上的考虑，来兼容旧的，其实很多写法可能有点过时了
 
 import (
-	"smallseal/dice/types"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	ds "github.com/sealdice/dicescript"
+	"golang.org/x/exp/rand"
+
+	"smallseal/dice/types"
 )
 
 func VarSetValueStr(ctx *types.MsgContext, s string, v string) {
@@ -185,117 +189,124 @@ func GetValueNameByAlias(s string, alias map[string][]string) string {
 	return name
 }
 
-// func SetTempVars(ctx *types.MsgContext, qqNickname string) {
-// 	// 设置临时变量
-// 	if ctx.Player != nil {
-// 		pcName := ctx.Player.Name
-// 		pcName = strings.ReplaceAll(pcName, "\n", "")
-// 		pcName = strings.ReplaceAll(pcName, "\r", "")
-// 		pcName = strings.ReplaceAll(pcName, `\n`, "")
-// 		pcName = strings.ReplaceAll(pcName, `\r`, "")
-// 		pcName = strings.ReplaceAll(pcName, `\f`, "")
+func SetTempVars(ctx *types.MsgContext, qqNickname string) {
+	// 设置临时变量
+	if ctx.Player != nil {
+		pcName := ctx.Player.Name
+		pcName = strings.ReplaceAll(pcName, "\n", "")
+		pcName = strings.ReplaceAll(pcName, "\r", "")
+		pcName = strings.ReplaceAll(pcName, `\n`, "")
+		pcName = strings.ReplaceAll(pcName, `\r`, "")
+		pcName = strings.ReplaceAll(pcName, `\f`, "")
 
-// 		VarSetValueStr(ctx, "$t玩家", fmt.Sprintf("<%s>", pcName))
-// 		if ctx.Dice != nil && !ctx.Dice.Config.PlayerNameWrapEnable {
-// 			VarSetValueStr(ctx, "$t玩家", pcName)
-// 		}
-// 		VarSetValueStr(ctx, "$t玩家_RAW", pcName)
-// 		VarSetValueStr(ctx, "$tQQ昵称", fmt.Sprintf("<%s>", qqNickname))
-// 		VarSetValueStr(ctx, "$t帐号昵称", fmt.Sprintf("<%s>", qqNickname))
-// 		VarSetValueStr(ctx, "$t账号昵称", fmt.Sprintf("<%s>", qqNickname))
-// 		VarSetValueStr(ctx, "$t帐号ID", ctx.Player.UserID)
-// 		VarSetValueStr(ctx, "$t账号ID", ctx.Player.UserID)
-// 		VarSetValueInt64(ctx, "$t个人骰子面数", int64(ctx.Player.DiceSideNum))
-// 		VarSetValueStr(ctx, "$tQQ", ctx.Player.UserID)
-// 		VarSetValueStr(ctx, "$t骰子帐号", ctx.EndPoint.UserID)
-// 		VarSetValueStr(ctx, "$t骰子账号", ctx.EndPoint.UserID)
-// 		VarSetValueStr(ctx, "$t骰子昵称", ctx.EndPoint.Nickname)
-// 		VarSetValueStr(ctx, "$t帐号ID_RAW", UserIDExtract(ctx.Player.UserID))
-// 		VarSetValueStr(ctx, "$t账号ID_RAW", UserIDExtract(ctx.Player.UserID))
+		VarSetValueStr(ctx, "$t玩家", fmt.Sprintf("<%s>", pcName))
+		// if ctx.Dice != nil && !ctx.Dice.Config.PlayerNameWrapEnable {
+		// 	VarSetValueStr(ctx, "$t玩家", pcName)
+		// }
+		VarSetValueStr(ctx, "$t玩家_RAW", pcName)
+		VarSetValueStr(ctx, "$tQQ昵称", fmt.Sprintf("<%s>", qqNickname))
+		VarSetValueStr(ctx, "$t帐号昵称", fmt.Sprintf("<%s>", qqNickname))
+		VarSetValueStr(ctx, "$t账号昵称", fmt.Sprintf("<%s>", qqNickname))
+		VarSetValueStr(ctx, "$t帐号ID", ctx.Player.UserId)
+		VarSetValueStr(ctx, "$t账号ID", ctx.Player.UserId)
+		VarSetValueInt64(ctx, "$t个人骰子面数", int64(ctx.Player.DiceSideNum))
+		VarSetValueStr(ctx, "$tQQ", ctx.Player.UserId)
+		// VarSetValueStr(ctx, "$t骰子帐号", ctx.EndPoint.UserID)
+		// VarSetValueStr(ctx, "$t骰子账号", ctx.EndPoint.UserID)
+		// VarSetValueStr(ctx, "$t骰子昵称", ctx.EndPoint.Nickname)
+		// VarSetValueStr(ctx, "$t帐号ID_RAW", UserIDExtract(ctx.Player.UserID))
+		// VarSetValueStr(ctx, "$t账号ID_RAW", UserIDExtract(ctx.Player.UserID))
 
-// 		if ctx.EndPoint.ProtocolType != "official" {
-// 			VarSetValueStr(ctx, "$t平台", ctx.EndPoint.Platform)
-// 		} else {
-// 			VarSetValueStr(ctx, "$t平台", "QQ-official")
-// 		}
+		// if ctx.EndPoint.ProtocolType != "official" {
+		// 	VarSetValueStr(ctx, "$t平台", ctx.EndPoint.Platform)
+		// } else {
+		// 	VarSetValueStr(ctx, "$t平台", "QQ-official")
+		// }
 
-// 		rpSeed := (time.Now().Unix() + (8 * 60 * 60)) / (24 * 60 * 60)
-// 		rpSeed += int64(fingerprint(ctx.EndPoint.UserID))
-// 		rpSeed += int64(fingerprint(ctx.Player.UserID))
-// 		randItem := rand.NewSource(rpSeed)
-// 		rp := randItem.Int63()%100 + 1
-// 		VarSetValueInt64(ctx, "$t人品", rp)
+		// rpSeed := (time.Now().Unix() + (8 * 60 * 60)) / (24 * 60 * 60)
+		// rpSeed += int64(fingerprint(ctx.EndPoint.UserID))
+		// rpSeed += int64(fingerprint(ctx.Player.UserID))
+		// randItem := rand.NewSource(rpSeed)
+		// rp := randItem.Int63()%100 + 1
+		// VarSetValueInt64(ctx, "$t人品", rp)
 
-// 		now := time.Now()
-// 		t, _ := strconv.ParseInt(now.Format("20060102"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tDate", t)
-// 		wd := int64(now.Weekday())
-// 		if wd == 0 {
-// 			wd = 7
-// 		}
-// 		VarSetValueInt64(ctx, "$tWeekday", wd)
+		now := time.Now()
+		t, _ := strconv.ParseInt(now.Format("20060102"), 10, 64)
+		VarSetValueInt64(ctx, "$tDate", t)
+		wd := int64(now.Weekday())
+		if wd == 0 {
+			wd = 7
+		}
+		VarSetValueInt64(ctx, "$tWeekday", wd)
 
-// 		t, _ = strconv.ParseInt(now.Format("2006"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tYear", t)
-// 		t, _ = strconv.ParseInt(now.Format("01"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tMonth", t)
-// 		t, _ = strconv.ParseInt(now.Format("02"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tDay", t)
-// 		t, _ = strconv.ParseInt(now.Format("15"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tHour", t)
-// 		t, _ = strconv.ParseInt(now.Format("04"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tMinute", t)
-// 		t, _ = strconv.ParseInt(now.Format("05"), 10, 64)
-// 		VarSetValueInt64(ctx, "$tSecond", t)
-// 		VarSetValueInt64(ctx, "$tTimestamp", now.Unix())
-// 	}
+		t, _ = strconv.ParseInt(now.Format("2006"), 10, 64)
+		VarSetValueInt64(ctx, "$tYear", t)
+		t, _ = strconv.ParseInt(now.Format("01"), 10, 64)
+		VarSetValueInt64(ctx, "$tMonth", t)
+		t, _ = strconv.ParseInt(now.Format("02"), 10, 64)
+		VarSetValueInt64(ctx, "$tDay", t)
+		t, _ = strconv.ParseInt(now.Format("15"), 10, 64)
+		VarSetValueInt64(ctx, "$tHour", t)
+		t, _ = strconv.ParseInt(now.Format("04"), 10, 64)
+		VarSetValueInt64(ctx, "$tMinute", t)
+		t, _ = strconv.ParseInt(now.Format("05"), 10, 64)
+		VarSetValueInt64(ctx, "$tSecond", t)
+		VarSetValueInt64(ctx, "$tTimestamp", now.Unix())
+	}
 
-// 	if ctx.Group != nil {
-// 		if ctx.MessageType == "group" {
-// 			VarSetValueStr(ctx, "$t群号", ctx.Group.GroupID)
-// 			VarSetValueStr(ctx, "$t群名", ctx.Group.GroupName)
-// 			VarSetValueStr(ctx, "$t群号_RAW", UserIDExtract(ctx.Group.GroupID))
-// 		}
-// 		VarSetValueInt64(ctx, "$t群组骰子面数", ctx.Group.DiceSideNum)
-// 		VarSetValueInt64(ctx, "$t当前骰子面数", getDefaultDicePoints(ctx))
-// 		if ctx.Group.System == "" {
-// 			ctx.Group.System = "coc7"
-// 			ctx.Group.UpdatedAtTime = time.Now().Unix()
-// 		}
-// 		VarSetValueStr(ctx, "$t游戏模式", ctx.Group.System)
-// 		VarSetValueStr(ctx, "$t规则模板", ctx.Group.System)
-// 		VarSetValueStr(ctx, "$tSystem", ctx.Group.System)
-// 		VarSetValueStr(ctx, "$t当前记录", ctx.Group.LogCurName)
-// 		VarSetValueInt64(ctx, "$t权限等级", int64(ctx.PrivilegeLevel))
+	if ctx.Group != nil {
+		// 	if ctx.MessageType == "group" {
+		// 		VarSetValueStr(ctx, "$t群号", ctx.Group.GroupID)
+		// 		VarSetValueStr(ctx, "$t群名", ctx.Group.GroupName)
+		// 		VarSetValueStr(ctx, "$t群号_RAW", UserIDExtract(ctx.Group.GroupID))
+		// 	}
+		VarSetValueInt64(ctx, "$t群组骰子面数", ctx.Group.DiceSideNum)
+		// VarSetValueInt64(ctx, "$t当前骰子面数", getDefaultDicePoints(ctx))
+		// 	if ctx.Group.System == "" {
+		// 		ctx.Group.System = "coc7"
+		// 		ctx.Group.UpdatedAtTime = time.Now().Unix()
+		// 	}
+		VarSetValueStr(ctx, "$t游戏模式", ctx.Group.System)
+		VarSetValueStr(ctx, "$t规则模板", ctx.Group.System)
+		VarSetValueStr(ctx, "$tSystem", ctx.Group.System)
+		// 	VarSetValueStr(ctx, "$t当前记录", ctx.Group.LogCurName)
+		// 	VarSetValueInt64(ctx, "$t权限等级", int64(ctx.PrivilegeLevel))
 
-// 		var isLogOn int64
-// 		if ctx.Group.LogOn {
-// 			isLogOn = 1
-// 		}
-// 		VarSetValueInt64(ctx, "$t日志开启", isLogOn)
-// 	}
+		// 	var isLogOn int64
+		// 	if ctx.Group.LogOn {
+		// 		isLogOn = 1
+		// 	}
+		// 	VarSetValueInt64(ctx, "$t日志开启", isLogOn)
+		// }
 
-// 	if ctx.MessageType == "group" {
-// 		VarSetValueStr(ctx, "$t消息类型", "group")
-// 	} else {
-// 		VarSetValueStr(ctx, "$t消息类型", "private")
-// 	}
-// }
+		// if ctx.MessageType == "group" {
+		// 	VarSetValueStr(ctx, "$t消息类型", "group")
+		// } else {
+		// 	VarSetValueStr(ctx, "$t消息类型", "private")
+	}
+}
 
 func DiceFormatTmpl(ctx *types.MsgContext, s string) string {
 	// TODO: 暂时没有这种操作
-	return DiceFormatTmpl(ctx, s)
-	// var text string
-	// a := ctx.Dice.TextMap[s]
-	// if a == nil {
-	// 	text = "<%未知项-" + s + "%>"
-	// } else {
-	// 	text = ctx.Dice.TextMap[s].PickSource(randSourceDrawAndTmplSelect).(string)
-	// 	ret, _ := DiceFormat(ctx, text)
-	// 	return ret
-	// }
+	var text string
 
-	// return text
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return "<%未知项-" + s + "%>"
+	}
+
+	items := ctx.TextTemplateMap[parts[0]][parts[1]]
+
+	if items == nil {
+		return "<%未知项-" + s + "%>"
+	} else {
+		rand.Seed(uint64(time.Now().UnixNano()))
+		idx := rand.Intn(len(items))
+		text = items[idx][0].(string)
+	}
+
+	ret, _ := DiceFormat(ctx, text)
+	return ret
 }
 
 func DiceFormat(ctx *types.MsgContext, s string) (string, error) { //nolint:revive
@@ -304,6 +315,7 @@ func DiceFormat(ctx *types.MsgContext, s string) (string, error) { //nolint:revi
 	vm.Ret = nil
 	vm.Error = nil
 	vm.Config.DisableStmts = false
+	SetTempVars(ctx, "")
 
 	s = CompatibleReplace(ctx, s)
 

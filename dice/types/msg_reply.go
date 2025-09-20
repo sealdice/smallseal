@@ -31,6 +31,9 @@ func (ms MessageSegments) ToText() string {
 }
 
 type MsgToReply struct {
+	AdapterId string
+	CommandId int64
+
 	Sender MsgSenderInfo
 	SendTo MsgSendToInfo
 

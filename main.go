@@ -35,6 +35,10 @@ func main() {
 	fmt.Println("DiceScript Shell v0.0.1")
 	ccTimes := 0
 
+	d.CallbackForSendMsg.Store("console", func(msg *types.MsgToReply) {
+		fmt.Printf("%s\n", msg.Segment.ToText())
+	})
+
 	for {
 		if text, err := line.Prompt(">>> "); err == nil {
 			if strings.TrimSpace(text) == "" {
@@ -42,7 +46,7 @@ func main() {
 			}
 			line.AppendHistory(text)
 
-			d.Execute(&types.Message{
+			d.Execute("", &types.Message{
 				MessageType: "group",
 				GroupID:     "1000",
 

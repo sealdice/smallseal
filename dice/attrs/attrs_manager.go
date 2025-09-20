@@ -8,42 +8,37 @@ import (
 
 	ds "github.com/sealdice/dicescript"
 
-	"smallseal/dice/attrs/attrs_io"
-	"smallseal/model/do"
 	"smallseal/utils"
 )
 
 type AttrsManager struct {
-	db any
-	// db     engine.DatabaseOperator
-	// logger *zap.SugaredLogger
 	cancel context.CancelFunc
 	m      utils.SyncMap[string, *AttributesItem]
+
+	io AttrsIO
+}
+
+func (am *AttrsManager) SetIO(io AttrsIO) {
+	am.io = io
 }
 
 func (am *AttrsManager) Stop() {
-	// logger.M().Info("结束数据库保存程序...")
 	am.cancel()
 }
 
-// LoadByCtx 获取当前角色，如有绑定，则获取绑定的角色，若无绑定，获取群内默认卡
-// func (am *AttrsManager) LoadByCtx(ctx *MsgContext) (*AttributesItem, error) {
-// 	// 如果是兼容性测试环境，跳过绑定查询以避免不必要的数据库操作
-// 	if ctx.IsCompatibilityTest {
-// 		return am.LoadByIdDirect(ctx.Group.GroupID, ctx.Player.UserID)
-// 	}
-// 	return am.Load(ctx.Group.GroupID, ctx.Player.UserID)
-// }
-
 func (am *AttrsManager) Load(groupId string, userId string) (*AttributesItem, error) {
 	userId = am.UIDConvert(userId)
+
+	if am.io == nil {
+		am.io = &MemoryAttrsIO{}
+	}
 
 	// 组装当前群-用户的id
 	gid := fmt.Sprintf("%s-%s", groupId, userId)
 
 	//	1. 首先获取当前群+用户所绑定的卡
 	// 绑定卡的id是nanoid
-	id, err := attrs_io.AttrsGetBindingSheetIdByGroupId(am.db, gid)
+	id, err := am.io.BindingIdGet(groupId, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -56,29 +51,21 @@ func (am *AttrsManager) Load(groupId string, userId string) (*AttributesItem, er
 	return am.LoadById(id)
 }
 
-// LoadByIdDirect 直接使用组合ID加载数据，跳过绑定查询（用于兼容性测试）
-func (am *AttrsManager) LoadByIdDirect(groupId string, userId string) (*AttributesItem, error) {
-	userId = am.UIDConvert(userId)
-	// 直接使用组合ID，跳过绑定查询
-	id := fmt.Sprintf("%s-%s", groupId, userId)
-	return am.LoadById(id)
-}
-
 func (am *AttrsManager) UIDConvert(userId string) string {
 	// 如果存在一个虚拟id，那么返回虚拟id，不存在原样返回
 	return userId
 }
 
-func (am *AttrsManager) GetCharacterList(userId string) ([]*do.AttributesItemDO, error) {
+func (am *AttrsManager) GetCharacterList(userId string) ([]*AttributesItem, error) {
 	userId = am.UIDConvert(userId)
-	lst, err := attrs_io.AttrsGetCharacterListByUserId(am.db, userId)
+	lst, err := am.io.ListByUid(userId)
 	if err != nil {
 		return nil, err
 	}
 	return lst, err
 }
 
-func (am *AttrsManager) CharNew(userId string, name string, sheetType string) (*do.AttributesItemDO, error) {
+func (am *AttrsManager) CharNew(userId string, name string, sheetType string) (*AttributesItem, error) {
 	userId = am.UIDConvert(userId)
 	dict := &ds.ValueMap{}
 	// dict.Store("$sheetType", ds.NewStrVal(sheetType))
@@ -87,17 +74,17 @@ func (am *AttrsManager) CharNew(userId string, name string, sheetType string) (*
 		return nil, err
 	}
 
-	return attrs_io.AttrsNewItem(am.db, &do.AttributesItemDO{
+	return &AttributesItem{
 		Name:      name,
 		OwnerId:   userId,
 		AttrsType: "character",
 		SheetType: sheetType,
 		Data:      json,
-	})
+	}, nil
 }
 
 func (am *AttrsManager) CharDelete(id string) error {
-	if err := attrs_io.AttrsDeleteById(am.db, id); err != nil {
+	if err := am.io.DeleteById(id); err != nil {
 		return err
 	}
 	// 从缓存中删除
@@ -119,28 +106,26 @@ func (am *AttrsManager) LoadById(id string) (*AttributesItem, error) {
 	}
 
 	// 2. 从新数据库加载
-	data, err := attrs_io.AttrsGetById(am.db, id)
-	if err == nil {
-		if data.IsDataExists() {
-			var v *ds.VMValue
-			v, err = ds.VMValueFromJSON(data.Data)
-			if err != nil {
-				return nil, err
+	data, err := am.io.GetById(id)
+	if err == nil && data.IsDataExists() {
+		var v *ds.VMValue
+		v, err = ds.VMValueFromJSON(data.Data)
+		if err != nil {
+			return nil, err
+		}
+		if dd, ok := v.ReadDictData(); ok {
+			i = &AttributesItem{
+				ID:           id,
+				valueMap:     dd.Dict,
+				Name:         data.Name,
+				SheetType:    data.SheetType,
+				LastUsedTime: time.Now().Unix(),
+				IsSaved:      true,
 			}
-			if dd, ok := v.ReadDictData(); ok {
-				i = &AttributesItem{
-					ID:           id,
-					valueMap:     dd.Dict,
-					Name:         data.Name,
-					SheetType:    data.SheetType,
-					LastUsedTime: time.Now().Unix(),
-					IsSaved:      true,
-				}
-				am.m.Store(id, i)
-				return i, nil
-			} else {
-				return nil, errors.New("角色数据类型不正确")
-			}
+			am.m.Store(id, i)
+			return i, nil
+		} else {
+			return nil, errors.New("角色数据类型不正确")
 		}
 	}
 	// 之前 else 是读不出时返回报错
@@ -207,28 +192,27 @@ func (am *AttrsManager) CheckAndFreeUnused() error {
 
 func (am *AttrsManager) CharBind(charId string, groupId string, userId string) error {
 	userId = am.UIDConvert(userId)
-	id := fmt.Sprintf("%s-%s", groupId, userId)
-	return attrs_io.AttrsBindCharacter(am.db, charId, id)
+	// id := fmt.Sprintf("%s-%s", groupId, userId)
+	return am.io.Bind(groupId, userId, charId)
 }
 
 // CharGetBindingId 获取当前群绑定的角色ID
 func (am *AttrsManager) CharGetBindingId(groupId string, userId string) (string, error) {
 	userId = am.UIDConvert(userId)
-	id := fmt.Sprintf("%s-%s", groupId, userId)
-	return attrs_io.AttrsGetBindingSheetIdByGroupId(am.db, id)
-}
-
-func (am *AttrsManager) CharIdGetByName(userId string, name string) (string, error) {
-	return attrs_io.AttrsGetIdByUidAndName(am.db, userId, name)
+	// id := fmt.Sprintf("%s-%s", groupId, userId) // TODO: 之前好像是用id拿的，待确认
+	return am.io.BindingIdGet(groupId, userId)
 }
 
 func (am *AttrsManager) CharCheckExists(userId string, name string) bool {
-	id, _ := am.CharIdGetByName(userId, name)
-	return id != ""
+	id, err := am.io.GetByUidAndName(userId, name)
+	if err != nil {
+		return false
+	}
+	return id != nil
 }
 
 func (am *AttrsManager) CharGetBindingGroupIdList(id string) []string {
-	all, err := attrs_io.AttrsCharGetBindingList(am.db, id)
+	all, err := am.io.BindingGroupIdList(id)
 	if err != nil {
 		return []string{}
 	}
@@ -246,7 +230,7 @@ func (am *AttrsManager) CharGetBindingGroupIdList(id string) []string {
 
 func (am *AttrsManager) CharUnbindAll(id string) []string {
 	all := am.CharGetBindingGroupIdList(id)
-	_, err := attrs_io.AttrsCharUnbindAll(am.db, id)
+	_, err := am.io.UnbindAll(id)
 	if err != nil {
 		return []string{}
 	}

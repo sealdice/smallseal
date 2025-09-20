@@ -1,7 +1,6 @@
 package dice
 
 import (
-	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -12,9 +11,12 @@ import (
 )
 
 type Dice struct {
+	GroupInfoManager GroupInfoManager
+
 	attrsManager *attrs.AttrsManager
-	groupMap     utils.SyncMap[string, *types.GroupInfo]
 	gameSystem   utils.SyncMap[string, *types.GameSystemTemplateV2]
+
+	CallbackForSendMsg utils.SyncMap[string, func(msg *types.MsgToReply)]
 
 	ExtList []*types.ExtInfo
 
@@ -27,7 +29,10 @@ type Dice struct {
 
 func NewDice() *Dice {
 	d := &Dice{
-		attrsManager: &attrs.AttrsManager{},
+		attrsManager:     &attrs.AttrsManager{},
+		GroupInfoManager: NewDefaultGroupInfoManager(),
+
+		CallbackForSendMsg: utils.SyncMap[string, func(msg *types.MsgToReply)]{},
 	}
 
 	d.attrsManager.Init()
@@ -48,23 +53,8 @@ func (d *Dice) getNextCommandID() int64 {
 	return d.curCommandID.Add(1)
 }
 
-func (d *Dice) GroupLoad(groupId string) (*types.GroupInfo, bool) {
-	return d.groupMap.Load(groupId)
-}
-
-func (d *Dice) GroupStore(groupId string, groupInfo *types.GroupInfo) {
-	d.groupMap.Store(groupId, groupInfo)
-}
-
-// func (d *Dice) GroupNew(groupId string) {
-// 	groupInfo := &types.GroupInfo{
-// 		GroupID: groupId,
-// 	}
-// 	d.groupMap.Store(groupId, groupInfo)
-// }
-
-func (d *Dice) Execute(msg *types.Message) {
-	mctx := &types.MsgContext{Dice: d}
+func (d *Dice) Execute(adapterId string, msg *types.Message) {
+	mctx := &types.MsgContext{Dice: d, AdapterId: adapterId, TextTemplateMap: DefaultTextMap}
 	mctx.AttrsManager = d.attrsManager
 
 	// mctx.MessageType = msg.MessageType
@@ -76,7 +66,7 @@ func (d *Dice) Execute(msg *types.Message) {
 	}
 
 	// 处理命令
-	groupInfo, ok := d.GroupLoad(msg.GroupID)
+	groupInfo, ok := d.GroupInfoManager.Load(msg.GroupID)
 
 	if !ok {
 		groupInfo = &types.GroupInfo{
@@ -87,13 +77,14 @@ func (d *Dice) Execute(msg *types.Message) {
 		for _, ext := range d.ExtList {
 			groupInfo.ActivatedExtList = append(groupInfo.ActivatedExtList, ext)
 		}
-		d.GroupStore(msg.GroupID, groupInfo)
+		d.GroupInfoManager.Store(msg.GroupID, groupInfo)
 	}
 
 	mctx.GameSystem, _ = d.gameSystem.Load(groupInfo.System)
 	mctx.Group = groupInfo
 	mctx.Player = &types.GroupPlayerInfo{
 		UserId: msg.Sender.UserID,
+		Name:   msg.Sender.Nickname,
 	}
 
 	groupInfo.UpdatedAtTime = time.Now().Unix()
@@ -103,7 +94,7 @@ func (d *Dice) Execute(msg *types.Message) {
 	cmdArgs := types.CommandParse(msg.Message, cmdLst, d.Config.CommandPrefix, platformPrefix, false)
 
 	if cmdArgs != nil {
-		mctx.CommandID = d.getNextCommandID()
+		mctx.CommandId = d.getNextCommandID()
 	}
 
 	// 收到群 test(1111) 内 XX(222) 的消息: 好看 (1232611291)
@@ -163,6 +154,9 @@ func (d *Dice) Execute(msg *types.Message) {
 
 func (d *Dice) SendReply(msg *types.MsgToReply) {
 	// TODO: 整几个 delegate 在这等着，先跑钩子，再跑delegate，adapter们都去注册delegate
-	text := msg.Segment.ToText()
-	fmt.Printf("%s\n", text)
+	// text := msg.Segment.ToText()
+	d.CallbackForSendMsg.Range(func(key string, value func(msg *types.MsgToReply)) bool {
+		value(msg)
+		return true
+	})
 }
