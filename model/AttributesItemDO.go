@@ -1,4 +1,4 @@
-package do
+package model
 
 type AttributesItemDO struct {
 	Id        string `gorm:"column:id"                                                    json:"id"`        // 如果是群内，那么是类似 QQ-Group:12345-QQ:678910，群外是nanoid

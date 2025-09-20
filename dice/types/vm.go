@@ -47,7 +47,7 @@ func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *Ga
 		// 属性读取
 		attr, err := getAttr()
 		if err == nil {
-			if val, ok := attr.LoadX(name); ok {
+			if val, ok := attr.Load(name); ok {
 				return val
 			}
 		}

@@ -147,7 +147,7 @@ func VarGetValue(ctx *types.MsgContext, s string) (*ds.VMValue, bool) {
 	if strings.HasPrefix(s, "$m") {
 		playerAttrs := ctx.LoadAttrsForCurUser()
 		if playerAttrs != nil {
-			return playerAttrs.LoadX(name)
+			return playerAttrs.Load(name)
 		}
 		return nil, false
 	}
@@ -156,7 +156,7 @@ func VarGetValue(ctx *types.MsgContext, s string) (*ds.VMValue, bool) {
 	if ctx.Group != nil && strings.HasPrefix(s, "$g") {
 		groupAttrs := ctx.LoadAttrsForCurGroup()
 		if groupAttrs != nil {
-			return groupAttrs.LoadX(s)
+			return groupAttrs.Load(s)
 		}
 		return nil, false
 	}
@@ -164,7 +164,7 @@ func VarGetValue(ctx *types.MsgContext, s string) (*ds.VMValue, bool) {
 	// 个人群变量
 	curAttrs := ctx.LoadAttrsForCurGroupUser()
 	if curAttrs != nil {
-		return curAttrs.LoadX(name)
+		return curAttrs.Load(name)
 	}
 
 	return nil, false
@@ -209,7 +209,7 @@ func SetTempVars(ctx *types.MsgContext, qqNickname string) {
 		VarSetValueStr(ctx, "$t账号昵称", fmt.Sprintf("<%s>", qqNickname))
 		VarSetValueStr(ctx, "$t帐号ID", ctx.Player.UserId)
 		VarSetValueStr(ctx, "$t账号ID", ctx.Player.UserId)
-		VarSetValueInt64(ctx, "$t个人骰子面数", int64(ctx.Player.DiceSideNum))
+		VarSetValueStr(ctx, "$t个人骰子", ctx.Player.DiceSideExpr)
 		VarSetValueStr(ctx, "$tQQ", ctx.Player.UserId)
 		// VarSetValueStr(ctx, "$t骰子帐号", ctx.EndPoint.UserID)
 		// VarSetValueStr(ctx, "$t骰子账号", ctx.EndPoint.UserID)
@@ -260,7 +260,7 @@ func SetTempVars(ctx *types.MsgContext, qqNickname string) {
 		// 		VarSetValueStr(ctx, "$t群名", ctx.Group.GroupName)
 		// 		VarSetValueStr(ctx, "$t群号_RAW", UserIDExtract(ctx.Group.GroupID))
 		// 	}
-		VarSetValueInt64(ctx, "$t群组骰子面数", ctx.Group.DiceSideNum)
+		VarSetValueStr(ctx, "$t群组骰子", ctx.Group.DiceSideExpr)
 		// VarSetValueInt64(ctx, "$t当前骰子面数", getDefaultDicePoints(ctx))
 		// 	if ctx.Group.System == "" {
 		// 		ctx.Group.System = "coc7"

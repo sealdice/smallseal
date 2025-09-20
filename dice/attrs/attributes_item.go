@@ -26,13 +26,13 @@ type AttributesItem struct {
 	IsSaved          bool
 }
 
-func (i *AttributesItem) Load(name string) *ds.VMValue {
-	v, _ := i.valueMap.Load(name)
-	i.LastUsedTime = time.Now().Unix()
-	return v
-}
+// func (i *AttributesItem) Load(name string) *ds.VMValue {
+// 	v, _ := i.valueMap.Load(name)
+// 	i.LastUsedTime = time.Now().Unix()
+// 	return v
+// }
 
-func (i *AttributesItem) LoadX(name string) (*ds.VMValue, bool) {
+func (i *AttributesItem) Load(name string) (*ds.VMValue, bool) {
 	v, exists := i.valueMap.Load(name)
 	i.LastUsedTime = time.Now().Unix()
 	return v, exists
@@ -110,4 +110,8 @@ func (i *AttributesItem) Len() int {
 
 func (i *AttributesItem) IsDataExists() bool {
 	return len(i.Data) > 0
+}
+
+func (i *AttributesItem) GetValueMap() *ds.ValueMap {
+	return i.valueMap
 }

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/samber/lo"
 	ds "github.com/sealdice/dicescript"
 	"gopkg.in/yaml.v3"
 
@@ -76,11 +77,12 @@ type StConfig struct {
 
 // StShowConfig st show配置
 type StShowConfig struct {
-	Top         []string          `yaml:"top"`         // 锁定在前面的几个
-	SortBy      string            `yaml:"sortBy"`      // 排序方式
-	Ignores     []string          `yaml:"ignores"`     // 忽略的属性
-	ShowValueAs map[string]string `yaml:"showValueAs"` // 影响单个属性的右侧内容
-	ShowKeyAs   map[string]string `yaml:"showKeyAs"`   // 影响单个属性的左侧内容
+	Top          []string          `yaml:"top"`          // 锁定在前面的几个
+	SortBy       string            `yaml:"sortBy"`       // 排序方式
+	Ignores      []string          `yaml:"ignores"`      // 忽略的属性
+	ShowValueAs  map[string]string `yaml:"showValueAs"`  // 影响单个属性的右侧内容
+	ShowKeyAs    map[string]string `yaml:"showKeyAs"`    // 影响单个属性的左侧内容
+	ItemsPerLine int               `yaml:"itemsPerLine"` // 每行显示多少个属性
 }
 
 // LoadGameSystemTemplate 从YAML或JSON文件加载游戏系统模板
@@ -183,6 +185,7 @@ func (t *GameSystemTemplateV2) GetAlias(varname string) string {
 }
 
 // 默认值获取搞得太复杂了
+// 这个是不经过计算的获取默认值，如果默认值是computed，那么返回的是computed
 // 四个返回值 val, detail, computed, exists
 func (t *GameSystemTemplateV2) GetDefaultValue(varname string) (*ds.VMValue, string, bool, bool) {
 	var detail string
@@ -198,5 +201,77 @@ func (t *GameSystemTemplateV2) GetDefaultValue(varname string) (*ds.VMValue, str
 	}
 
 	return nil, detail, false, false
+}
 
+func (t *GameSystemTemplateV2) GetShowKeyAs(ctx *MsgContext, k string) (string, error) {
+	var r *ds.VMValue
+	var err error
+	// 如果存在showKeyAs，那么就根据表达式求值
+	if expr, exists := t.Commands.St.Show.ShowKeyAs[k]; exists {
+		r, _, err = ctx.EvalBase(expr, &ds.RollConfig{
+			DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
+		})
+		if err == nil {
+			k = r.ToString()
+		}
+	}
+	return k, err
+}
+
+func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VMValue, error) {
+	var r *ds.VMValue
+	var err error
+
+	if expr, exists := t.Commands.St.Show.ShowValueAs[k]; exists {
+		// ctx.SystemTemplate = t
+		r, _, err = ctx.EvalBase(expr, &ds.RollConfig{
+			DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
+		})
+		if err == nil {
+			return r, nil
+		}
+	}
+
+	// 通配值
+	if expr, exists := t.Commands.St.Show.ShowValueAs["*"]; exists {
+		// ctx.SystemTemplate = t
+		// 这个 store 是干啥的，不知道啥地方用到了？
+		// ctx.vm.StoreNameLocal("name", ds.NewStrVal(baseK))
+		r, _, err = ctx.EvalFString(expr, nil)
+		if err == nil {
+			return r, nil
+		}
+		return ds.NewIntVal(0), err
+	}
+
+	return ds.NewIntVal(0), nil
+}
+
+func (t *GameSystemTemplateV2) GetRealValueBase(ctx *MsgContext, k string) (*ds.VMValue, error) {
+	// 跟 showas 一样，但是不采用showas而是返回实际值
+	// 显示本体
+	am := ctx.AttrsManager
+	curAttrs := lo.Must(am.Load(ctx.Group.GroupId, ctx.Player.UserId))
+	v, exists := curAttrs.Load(k)
+	if exists {
+		return v, nil
+	}
+
+	// 默认值
+	v, _, _, exists = t.GetDefaultValue(k)
+	if exists {
+		return v, nil
+	}
+
+	// 不存在的值
+	return nil, nil //nolint:nilnil
+}
+
+func (t *GameSystemTemplateV2) GetRealValue(ctx *MsgContext, k string) (*ds.VMValue, error) {
+	v, err := t.GetRealValueBase(ctx, k)
+	if v == nil && err == nil {
+		// 不存在的值，强行补0
+		return ds.NewIntVal(0), nil
+	}
+	return v, err
 }

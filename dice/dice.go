@@ -1,6 +1,7 @@
 package dice
 
 import (
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -159,4 +160,15 @@ func (d *Dice) SendReply(msg *types.MsgToReply) {
 		value(msg)
 		return true
 	})
+}
+
+func (d *Dice) AttrsSetIO(io attrs.AttrsIO) {
+	d.attrsManager.SetIO(io)
+}
+
+func (d *Dice) GameSystemMapLoad(name string) (*types.GameSystemTemplateV2, error) {
+	if gameSystem, ok := d.gameSystem.Load(name); ok {
+		return gameSystem, nil
+	}
+	return nil, fmt.Errorf("game system not found: %s", name)
 }

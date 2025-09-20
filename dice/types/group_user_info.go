@@ -23,7 +23,7 @@ type GroupPlayerInfo struct {
 	AutoSetNameTemplate string `gorm:"column:auto_set_name_template" jsbind:"autoSetNameTemplate" yaml:"autoSetNameTemplate"` // 名片模板
 
 	// level int 权限
-	DiceSideNum int `gorm:"column:dice_side_num" yaml:"diceSideNum"` // 面数，为0时等同于d100
+	DiceSideExpr string `gorm:"column:dice_side_expr" yaml:"diceSideExpr"` // 面数表达式，为空时等同于d100
 	// 非数据库信息
 	ValueMapTemp *dicescript.ValueMap `gorm:"-" yaml:"-"` // 玩家的群内临时变量
 	// ValueMapTemp map[string]*VMValue  `yaml:"-"`           // 玩家的群内临时变量
@@ -54,9 +54,9 @@ type GroupInfo struct {
 	DiceIDActiveMap *utils.SyncMap[string, bool] `json:"diceIdActiveMap" yaml:"diceIds,flow"` // 对应的骰子ID(格式 平台:ID)，对应单骰多号情况，例如骰A B都加了群Z，A退群不会影响B在群内服务
 	DiceIDExistsMap *utils.SyncMap[string, bool] `json:"diceIdExistsMap" yaml:"-"`            // 对应的骰子ID(格式 平台:ID)是否存在于群内
 	BotList         *utils.SyncMap[string, bool] `json:"botList"         yaml:"botList,flow"` // 其他骰子列表
-	DiceSideNum     int64                        `json:"diceSideNum"     yaml:"diceSideNum"`  // 以后可能会支持 1d4 这种默认面数，暂不开放给js
 	DiceSideExpr    string                       `json:"diceSideExpr"    yaml:"diceSideExpr"` //
 	System          string                       `json:"system"          yaml:"system"`       // 规则系统，概念同bcdice的gamesystem，距离如dnd5e coc7
+	// DiceSideNum     int64                        `json:"diceSideNum"     yaml:"diceSideNum"`  // 以后可能会支持 1d4 这种默认面数，暂不开放给js
 
 	HelpPackages []string `json:"helpPackages"   yaml:"-"`
 	CocRuleIndex int      `jsbind:"cocRuleIndex" json:"cocRuleIndex" yaml:"cocRuleIndex"`
