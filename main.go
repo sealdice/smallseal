@@ -36,7 +36,7 @@ func main() {
 	ccTimes := 0
 
 	d.CallbackForSendMsg.Store("console", func(msg *types.MsgToReply) {
-		fmt.Printf("%s\n", msg.Segment.ToText())
+		fmt.Printf("%s\n", msg.Segments.ToText())
 	})
 
 	for {

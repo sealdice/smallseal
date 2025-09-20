@@ -11,6 +11,12 @@ type SimpleUserInfo struct {
 	UserName string // 用户名
 }
 
+// AdapterCallback 适配器回调接口
+type AdapterCallback interface {
+	OnError(err error)
+	OnMessageReceived(info *MessageSendCallbackInfo)
+}
+
 // MessageSendRequest 发送消息请求
 type MessageSendRequest struct {
 	RequestBase

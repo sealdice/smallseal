@@ -17,6 +17,10 @@ type PlatformAdapter interface {
 	MsgSendFileToPerson(request *MessageSendFileRequest) (bool, error)
 	MsgSendFileToGroup(request *MessageSendFileRequest) (bool, error)
 
+	// 消息操作
+	MsgEdit(request *MessageOperationRequest) (bool, error)
+	MsgRecall(request *MessageOperationRequest) (bool, error)
+
 	// 群组操作
 	GroupMemberBan(request *GroupOperationBanRequest) (bool, error)
 	GroupMemberKick(request *GroupOperationKickRequest) (bool, error)
@@ -25,13 +29,11 @@ type PlatformAdapter interface {
 	GroupCardNameSet(request *GroupOperationCardNameSetRequest) (bool, error)
 	GroupInfoGet(groupID any) (*GroupInfo, error)
 
-	// 消息操作
-	MsgEdit(request *MessageOperationRequest) (bool, error)
-	MsgRecall(request *MessageOperationRequest) (bool, error)
-
 	// 好友操作
 	FriendDelete(request *FriendOperationRequest) (bool, error)
 	FriendAdd(request *FriendOperationRequest) (bool, error)
+
+	SetCallback(callback AdapterCallback)
 }
 
 // 实现检查

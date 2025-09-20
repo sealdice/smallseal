@@ -40,6 +40,6 @@ type MsgToReply struct {
 	Time        int64  `jsbind:"time"        json:"time"`        // 发送时间
 	MessageType string `jsbind:"messageType" json:"messageType"` // group private
 
-	Segment     MessageSegments `jsbind:"segment" json:"-" yaml:"-"`
+	Segments    MessageSegments `jsbind:"segment" json:"-" yaml:"-"`
 	CommandData any             // 制定一个格式，返回一些更加本质的东西，到外面去二次套壳
 }
