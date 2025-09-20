@@ -25,7 +25,7 @@ type Message struct {
 	Platform    string     `jsbind:"platform"    json:"platform"` // 当前平台
 	GroupName   string     `json:"groupName"`
 	// Note(Szzrain): 这里是消息段，为了支持多种消息类型，目前只有 Milky 支持，其他平台也应该尽快迁移支持，并使用 Session.ExecuteNew 方法
-	Segment MessageSegments `jsbind:"segment" json:"-" yaml:"-"`
+	Segments MessageSegments `jsbind:"segment" json:"segments" yaml:"-"`
 }
 
 type CQCommand struct {

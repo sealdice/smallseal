@@ -16,7 +16,7 @@ import (
 // MessageSendCallbackInfo 消息发送回调信息
 type MessageSendCallbackInfo struct {
 	Sender  *SimpleUserInfo
-	Message *types.Message
+	Message *types.Message `json:"message"` // 等等，这对吗？不应该是 MessageSegments？
 }
 
 // GroupNameCacheItem 群组名称缓存项
@@ -96,7 +96,7 @@ func (pa *PlatformAdapterMilky) MsgSendToGroup(request *MessageSendRequest) (boo
 		Platform:    "QQ",
 		MessageType: "group",
 		GroupID:     groupIDStr,
-		Segment:     request.Segments,
+		Segments:    request.Segments,
 		RawID:       ret.MessageSeq,
 	}
 
@@ -162,7 +162,7 @@ func (pa *PlatformAdapterMilky) MsgSendToPerson(request *MessageSendRequest) (bo
 	msg := &types.Message{
 		Platform:    "QQ",
 		MessageType: "private",
-		Segment:     request.Segments,
+		Segments:    request.Segments,
 		RawID:       ret.MessageSeq,
 	}
 
@@ -340,22 +340,22 @@ func (pa *PlatformAdapterMilky) Serve() int {
 				switch seg := segment.(type) {
 				case *milky.TextElement:
 					log.Debugf(" Text: %s", seg.Text)
-					msg.Segment = append(msg.Segment, &types.TextElement{
+					msg.Segments = append(msg.Segments, &types.TextElement{
 						Content: seg.Text,
 					})
 				case *milky.ImageElement:
 					log.Debugf(" Image: %s", seg.TempURL)
-					msg.Segment = append(msg.Segment, &types.ImageElement{
+					msg.Segments = append(msg.Segments, &types.ImageElement{
 						URL: seg.TempURL,
 					})
 				case *milky.AtElement:
 					log.Debugf(" At: %d", seg.UserID)
-					msg.Segment = append(msg.Segment, &types.AtElement{
+					msg.Segments = append(msg.Segments, &types.AtElement{
 						Target: strconv.FormatInt(seg.UserID, 10),
 					})
 				case *milky.ReplyElement:
 					log.Debugf(" Reply to message ID: %d", seg.MessageSeq)
-					msg.Segment = append(msg.Segment, &types.ReplyElement{
+					msg.Segments = append(msg.Segments, &types.ReplyElement{
 						ReplySeq: strconv.FormatInt(seg.MessageSeq, 10),
 					})
 				default:
@@ -364,7 +364,7 @@ func (pa *PlatformAdapterMilky) Serve() int {
 			}
 		}
 
-		if len(msg.Segment) == 0 {
+		if len(msg.Segments) == 0 {
 			return // 如果没有消息内容，忽略
 		}
 
@@ -396,7 +396,7 @@ func (pa *PlatformAdapterMilky) Serve() int {
 			Sender: types.SenderBase{
 				UserID: FormatDiceIDQQ(strconv.FormatInt(m.SenderID, 10)),
 			},
-			Segment: []types.IMessageElement{
+			Segments: []types.IMessageElement{
 				&types.PokeElement{
 					Target: strconv.FormatInt(m.ReceiverID, 10),
 				},
@@ -425,7 +425,6 @@ func (pa *PlatformAdapterMilky) Serve() int {
 		return 1
 	}
 
-	fmt.Println("Milky 连接成功 1")
 	pa.isAlive = true
 	fmt.Println("Milky 连接成功")
 	return 0

@@ -27,7 +27,7 @@ func (cb *AdapterCallbackBase2) OnMessageReceived(info *adapters.MessageSendCall
 		fmt.Printf("OnMessageReceived: marshal err, info=%v, err=%v\n", info, err)
 		return
 	}
-	fmt.Printf("OnMessageReceived: %v, msg=%s\n", string(jsonInfo), info.Message.Segment.ToText())
+	fmt.Printf("OnMessageReceived: %v, msg=%s\n", string(jsonInfo), info.Message.Segments.ToText())
 	// 将接收到的消息转发给dice对象处理
 	if cb.dice != nil && info.Message != nil {
 		cb.dice.Execute("", info.Message)
@@ -44,6 +44,8 @@ func NewMilkyConnItem() *adapters.PlatformAdapterMilky {
 }
 
 func main() {
+	fmt.Println("Small Seal v0.0.1")
+
 	d := dice.NewDice()
 	conn := NewMilkyConnItem()
 
@@ -54,8 +56,6 @@ func main() {
 		dice: d,
 	}
 	conn.SetCallback(callback)
-
-	fmt.Println("Small Seal v0.0.1")
 
 	d.CallbackForSendMsg.Store("milky", func(msg *types.MsgToReply) {
 		if conn != nil {
@@ -87,5 +87,4 @@ func main() {
 
 	// 保持程序运行，等待消息到来
 	select {}
-
 }

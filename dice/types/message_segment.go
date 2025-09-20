@@ -43,7 +43,7 @@ const (
 const maxFileSize = 1024 * 1024 * 50 // 50MB
 
 type TextElement struct {
-	Content string `jsbind:"content"`
+	Content string `jsbind:"content" json:"content"`
 }
 
 func (t *TextElement) Type() ElementType {
@@ -51,7 +51,7 @@ func (t *TextElement) Type() ElementType {
 }
 
 type AtElement struct {
-	Target string `jsbind:"target"`
+	Target string `jsbind:"target" json:"target"`
 }
 
 func (t *AtElement) Type() ElementType {
@@ -59,10 +59,10 @@ func (t *AtElement) Type() ElementType {
 }
 
 type ReplyElement struct {
-	ReplySeq string            `jsbind:"replySeq"` // 回复的目标消息ID
-	Sender   string            `jsbind:"sender"`   // 回复的目标消息发送者ID
-	GroupID  string            `jsbind:"groupID"`  // 回复群聊消息时的群号
-	Elements []IMessageElement `jsbind:"elements"` // 回复的消息内容
+	ReplySeq string            `jsbind:"replySeq" json:"replySeq"` // 回复的目标消息ID
+	Sender   string            `jsbind:"sender" json:"sender"`     // 回复的目标消息发送者ID
+	GroupID  string            `jsbind:"groupID" json:"groupID"`   // 回复群聊消息时的群号
+	Elements []IMessageElement `jsbind:"elements" json:"elements"` // 回复的消息内容
 }
 
 func (t *ReplyElement) Type() ElementType {
@@ -70,7 +70,7 @@ func (t *ReplyElement) Type() ElementType {
 }
 
 type TTSElement struct {
-	Content string
+	Content string `json:"content"`
 }
 
 func (t *TTSElement) Type() ElementType {
@@ -78,10 +78,10 @@ func (t *TTSElement) Type() ElementType {
 }
 
 type FileElement struct {
-	ContentType string
-	Stream      io.Reader
-	File        string
-	URL         string
+	ContentType string    `json:"contentType"`
+	Stream      io.Reader `json:"-"` // 不序列化 Stream
+	File        string    `json:"file"`
+	URL         string    `json:"url"`
 }
 
 func (l *FileElement) Type() ElementType {
@@ -89,8 +89,8 @@ func (l *FileElement) Type() ElementType {
 }
 
 type ImageElement struct {
-	File *FileElement
-	URL  string
+	File *FileElement `json:"file,omitempty"`
+	URL  string       `json:"url"`
 }
 
 func (l *ImageElement) Type() ElementType {
@@ -98,7 +98,7 @@ func (l *ImageElement) Type() ElementType {
 }
 
 type RecordElement struct {
-	File *FileElement
+	File *FileElement `json:"file,omitempty"`
 }
 
 func (r *RecordElement) Type() ElementType {
@@ -106,7 +106,7 @@ func (r *RecordElement) Type() ElementType {
 }
 
 type FaceElement struct {
-	FaceID string `jsbind:"faceID"`
+	FaceID string `jsbind:"faceID" json:"faceID"`
 }
 
 func (f *FaceElement) Type() ElementType {
@@ -114,7 +114,7 @@ func (f *FaceElement) Type() ElementType {
 }
 
 type PokeElement struct {
-	Target string `jsbind:"target"` // 戳一戳的目标ID
+	Target string `jsbind:"target" json:"target"` // 戳一戳的目标ID
 }
 
 func (p *PokeElement) Type() ElementType {
@@ -133,6 +133,7 @@ func CQToText(t string, d map[string]string) IMessageElement {
 	org += "]"
 	return newText(org)
 }
+
 func getFileName(header http.Header) string {
 	contentDisposition := header.Get("Content-Disposition")
 	if contentDisposition == "" {

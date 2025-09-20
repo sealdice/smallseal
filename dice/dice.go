@@ -2,6 +2,7 @@ package dice
 
 import (
 	"fmt"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -62,7 +63,7 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 	// mctx.MessageType = msg.MessageType
 	// mctx.IsPrivate = mctx.MessageType == "private"
 
-	msg.Message = msg.Segment.ToText()
+	msg.Message = msg.Segments.ToText()
 	if msg.MessageType != "group" && msg.MessageType != "private" {
 		return
 	}
@@ -91,7 +92,15 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 
 	groupInfo.UpdatedAtTime = time.Now().Unix()
 
-	cmdLst := []string{"r", "st"}
+	// 遍历 ext，获取指令列表
+	cmdLst := []string{}
+	for _, ext := range groupInfo.ActivatedExtList {
+		for cmd := range ext.CmdMap {
+			cmdLst = append(cmdLst, cmd)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(cmdLst)))
+
 	platformPrefix := "QQ"
 	cmdArgs := types.CommandParse(msg.Message, cmdLst, d.Config.CommandPrefix, platformPrefix, false)
 

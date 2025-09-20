@@ -5,6 +5,7 @@ import (
 )
 
 // PlatformAdapter 平台适配器接口 - 纯协议接口，不依赖业务上下文
+// 感觉 Message 类型还要理一理
 type PlatformAdapter interface {
 	// 连接管理
 	IsAlive() bool

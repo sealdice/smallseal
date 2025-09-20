@@ -54,7 +54,7 @@ func main() {
 					UserID:   "123",
 					Nickname: "seal",
 				},
-				Segment: []types.IMessageElement{
+				Segments: []types.IMessageElement{
 					&types.TextElement{
 						Content: text,
 					},
