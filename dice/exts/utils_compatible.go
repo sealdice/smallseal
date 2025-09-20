@@ -91,15 +91,15 @@ func DiceExprEvalBase(ctx *types.MsgContext, s string, flags RollExtraFlags) (*V
 	s = CompatibleReplace(ctx, s)
 
 	err := vm.Run(s)
-	if err != nil || vm.Ret == nil {
-		return &VMResultV2m{
-			VMValue:   vm.Ret,
-			vm:        vm,
-			cocPrefix: cocFlagVarPrefix,
-			errV2:     err,
-		}, vm.GetDetailText(), nil
+	if err != nil {
+		return nil, "", err
 	}
-	return nil, "", err
+	return &VMResultV2m{
+		VMValue:   vm.Ret,
+		vm:        vm,
+		cocPrefix: cocFlagVarPrefix,
+		errV2:     err,
+	}, vm.GetDetailText(), nil
 }
 
 // generateRandSeed 生成一个随机种子，由当前时间戳、对象指针、进程ID和堆栈信息组成

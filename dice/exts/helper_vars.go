@@ -287,7 +287,8 @@ func SetTempVars(ctx *types.MsgContext, qqNickname string) {
 }
 
 func DiceFormatTmpl(ctx *types.MsgContext, s string) string {
-	// TODO: 暂时没有这种操作
+	// 注: 这里有问题，格式化取值应该是变量重载的一环，这会导致模板中载入模板变量失败
+	// 后记: 这段代码与前面重复，但是暂时没想明白怎么改
 	var text string
 
 	parts := strings.SplitN(s, ":", 2)

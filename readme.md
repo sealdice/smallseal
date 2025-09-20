@@ -18,7 +18,10 @@ DiceScript Shell v0.0.1
 * adapter 重新设计
 * 指令回复时携带更多信息，能进行二次渲染
 * 加入几个接收消息、发送后的钩子，以便于进行预处理、格式转换、敏感词处理等
-
+* 指令解析
+* 实现 Text 和 Segment[] 的无缝互转
+* 想一下 message_old.go 里面的 Message 能否和返回的那个 MsgToReply 统一化？
+* 重新实现难度检定
 
 ## 内置扩展函数
 

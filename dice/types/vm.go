@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
+	"time"
+
+	"golang.org/x/exp/rand"
 
 	ds "github.com/sealdice/dicescript"
 
 	"smallseal/dice/attrs"
 )
 
-func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2) *ds.Context {
+func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2, textTemplate TextTemplateWithWeightDict) *ds.Context {
 	vm := ds.NewVM()
 
 	vm.Config.EnableDiceWoD = true
@@ -157,6 +161,17 @@ func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *Ga
 		curVal = getAttrByName(nameOrigin)
 
 		// TODO: 规则模板中的读取拦截
+
+		if curVal == nil {
+			parts := strings.SplitN(nameOrigin, ":", 2)
+			if len(parts) == 2 {
+				items := textTemplate[parts[0]][parts[1]]
+				rand.Seed(uint64(time.Now().UnixNano()))
+				idx := rand.Intn(len(items))
+				text := items[idx][0].(string)
+				curVal = ds.NewComputedVal("\x1e" + text + "\x1e")
+			}
+		}
 
 		if curVal == nil {
 			// 鉴于骰点环境的现实情况，设置为0

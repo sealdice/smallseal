@@ -36,7 +36,7 @@ type MsgContext struct {
 
 func (ctx *MsgContext) GetVM() *ds.Context {
 	if ctx.vm == nil {
-		ctx.vm = newVM(ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem)
+		ctx.vm = newVM(ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem, ctx.TextTemplateMap)
 	}
 	return ctx.vm
 }
