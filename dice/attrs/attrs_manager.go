@@ -38,10 +38,10 @@ func (am *AttrsManager) Load(groupId string, userId string) (*AttributesItem, er
 
 	//	1. 首先获取当前群+用户所绑定的卡
 	// 绑定卡的id是nanoid
-	id, err := am.io.BindingIdGet(groupId, userId)
-	if err != nil {
-		return nil, err
-	}
+	id, _ := am.io.BindingIdGet(groupId, userId)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// 2. 如果取不到，那么取用户在当前群的默认卡
 	if id == "" {
@@ -102,6 +102,11 @@ func (am *AttrsManager) LoadById(id string) (*AttributesItem, error) {
 	// 但是。。如果有人把这个对象一直持有呢？
 	i, exists := am.m.Load(id)
 	if exists {
+		// cache
+		// i.Range(func(key string, value *ds.VMValue) bool {
+		// 	fmt.Println("x", key, value.ToString())
+		// 	return true
+		// })
 		return i, nil
 	}
 

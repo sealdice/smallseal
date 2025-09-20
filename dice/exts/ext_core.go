@@ -286,6 +286,65 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 		},
 	}
 
+	textHelp := ".text <文本模板> // 文本指令，例: .text 看看手气: {1d16}"
+	cmdText := &types.CmdItemInfo{
+		Name:      "text",
+		ShortHelp: textHelp,
+		Help:      "文本模板指令:\n" + textHelp,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			// if ctx.Dice.Config.TextCmdTrustOnly {
+			// 	// 检查master和信任权限
+			// 	// 拒绝无权限访问
+			// 	if ctx.PrivilegeLevel < 70 {
+			// 		ReplyToSender(ctx, msg, "你不具备Master权限")
+			// 		return CmdExecuteResult{Matched: true, Solved: true}
+			// 	}
+			// }
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+
+			tmpl := ctx.GetCharTemplate()
+			ctx.Eval(tmpl.PreloadCode, nil)
+			val := cmdArgs.GetArgN(1)
+
+			if val != "" {
+				// ctx.Player.TempValueAlias = nil // 防止dnd的hp被转为“生命值”
+				r, _, err := ctx.EvalFString(cmdArgs.CleanArgs, &ds.RollConfig{DisableStmts: true})
+
+				if err == nil {
+					text := r.ToString()
+
+					if kw := cmdArgs.GetKwarg("asm"); r != nil && kw != nil {
+						// if ctx.PrivilegeLevel >= 40 {
+						// 	asm := r.GetAsmText()
+						// 	text += "\n" + asm
+						// }
+						text += "\n" + ctx.GetVM().GetAsmText()
+					}
+
+					seemsCommand := false
+					if strings.HasPrefix(text, ".") || strings.HasPrefix(text, "。") || strings.HasPrefix(text, "!") || strings.HasPrefix(text, "/") {
+						seemsCommand = true
+						if strings.HasPrefix(text, "..") || strings.HasPrefix(text, "。。") || strings.HasPrefix(text, "!!") {
+							seemsCommand = false
+						}
+					}
+
+					if seemsCommand {
+						ReplyToSender(ctx, msg, "你可能在利用text让骰子发出指令文本，这被视为恶意行为并已经记录")
+					} else {
+						ReplyToSender(ctx, msg, text)
+					}
+				} else {
+					ReplyToSender(ctx, msg, "执行出错:"+err.Error())
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+		},
+	}
+
 	cmdMap["r"] = cmdRoll
 	cmdMap["rd"] = cmdRoll
 	cmdMap["roll"] = cmdRoll
@@ -295,6 +354,8 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 	cmdMap["rx"] = cmdRollX
 	cmdMap["rxh"] = cmdRollX
 	cmdMap["rhx"] = cmdRollX
+
+	cmdMap["text"] = cmdText
 
 	theExt.CmdMap = cmdMap
 

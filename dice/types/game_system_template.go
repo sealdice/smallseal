@@ -244,7 +244,8 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 		return ds.NewIntVal(0), err
 	}
 
-	return ds.NewIntVal(0), nil
+	// 没有二次覆盖，读取真实值
+	return t.GetRealValue(ctx, k)
 }
 
 func (t *GameSystemTemplateV2) GetRealValueBase(ctx *MsgContext, k string) (*ds.VMValue, error) {

@@ -46,6 +46,7 @@ func NewDice() *Dice {
 	d.gameSystem.Store(coc7.Name, coc7)
 
 	exts.RegisterBuiltinExtCore(d)
+	exts.RegisterBuiltinExtCoc7(d)
 
 	return d
 }

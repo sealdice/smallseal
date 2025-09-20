@@ -180,6 +180,10 @@ func cmdStGetItemsForShow(mctx *types.MsgContext, tmpl *types.GameSystemTemplate
 			}
 
 			v, err = tmpl.GetShowValueAs(mctx, k)
+			if err == nil && v.TypeId == ds.VMTypeComputedValue {
+				v = v.ComputedExecute(mctx.GetVM(), nil)
+				err = mctx.GetVM().Error
+			}
 			if err != nil {
 				return nil, 0, errors.New("模板卡异常(value), 属性: " + k + "\n报错: " + err.Error())
 			}
@@ -482,9 +486,17 @@ func getCmdStBase(soi CmdStOverrideInfo) *types.CmdItemInfo {
 				}
 			}
 
-			mctx.Eval(tmpl.PreloadCode, nil)
-			if tmplShow != tmpl {
-				mctx.Eval(tmplShow.PreloadCode, nil)
+			// 等下，为啥要执行两遍，旧代码也是这样？而且没检查错误
+			// mctx.Eval(tmpl.PreloadCode, nil)
+			// if tmplShow != tmpl {
+			// 	mctx.Eval(tmplShow.PreloadCode, nil)
+			// }
+			if tmpl.PreloadCode != "" {
+				mctx.Eval(tmpl.PreloadCode, nil)
+				if mctx.GetVM().Error != nil {
+					ReplyToSender(mctx, msg, "属性设置指令执行失败："+mctx.GetVM().Error.Error())
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
 			}
 
 			if soi.CommandSolve != nil {
