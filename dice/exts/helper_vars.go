@@ -306,7 +306,14 @@ func DiceFormatTmpl(ctx *types.MsgContext, s string) string {
 		text = items[idx][0].(string)
 	}
 
+	_ = ctx.LoadRecordFetchAndClear()
 	ret, _ := DiceFormat(ctx, text)
+	rs := ctx.LoadRecordFetchAndClear()
+	ctx.CommandFormatInfo = append(ctx.CommandFormatInfo, &types.CommandFormatInfo{
+		Key:         s,
+		Text:        text,
+		LoadRecords: rs,
+	})
 	return ret
 }
 

@@ -381,41 +381,130 @@ func (pa *PlatformAdapterMilky) Serve() int {
 		}
 	})
 
-	// 添加戳一戳处理器
+	// 添加事件处理器
 	session.AddHandler(func(session2 *milky.Session, m *milky.GroupNudge) {
 		if m == nil {
 			return
 		}
 		log.Debugf("Received group nudge: %d -> %d in group %d", m.SenderID, m.ReceiverID, m.GroupID)
 
-		msg := &types.Message{
-			Platform:    "QQ",
-			MessageType: "group",
-			GroupID:     FormatDiceIDQQGroup(strconv.FormatInt(m.GroupID, 10)),
-			Time:        time.Now().Unix(),
-			Sender: types.SenderBase{
-				UserID: FormatDiceIDQQ(strconv.FormatInt(m.SenderID, 10)),
-			},
-			Segments: []types.IMessageElement{
-				&types.PokeElement{
-					Target: strconv.FormatInt(m.ReceiverID, 10),
-				},
-			},
+		raw := map[string]any{
+			"group_id":    m.GroupID,
+			"sender_id":   m.SenderID,
+			"receiver_id": m.ReceiverID,
 		}
 
-		fmt.Println("戳一戳", msg)
-		// 通过回调处理戳一戳
-		// TODO: 没有回调，给dice一个单独的回调函数
-		// if pa.callback != nil {
-		// 	info := &MessageSendCallbackInfo{
-		// 		Sender: &SimpleUserInfo{
-		// 			UserId:   msg.Sender.UserID,
-		// 			UserName: msg.Sender.Nickname,
-		// 		},
-		// 		Message: msg,
-		// 	}
-		// 	pa.callback.OnMessageReceived(info)
-		// }
+		pa.emitAdapterEvent(
+			"notice",
+			"group_nudge",
+			"",
+			time.Now().Unix(),
+			formatMilkyGroupID(m.GroupID),
+			formatMilkyUserID(m.ReceiverID),
+			formatMilkyUserID(m.SenderID),
+			raw,
+		)
+	})
+
+	session.AddHandler(func(session2 *milky.Session, m *milky.GroupMemberDecrease) {
+		if m == nil {
+			return
+		}
+		log.Debugf("Received group member decrease in %d: user=%d operator=%d", m.GroupID, m.UserID, m.OperatorID)
+
+		raw := map[string]any{
+			"group_id":    m.GroupID,
+			"user_id":     m.UserID,
+			"operator_id": m.OperatorID,
+		}
+
+		pa.emitAdapterEvent(
+			"notice",
+			"group_member_decrease",
+			"",
+			time.Now().Unix(),
+			formatMilkyGroupID(m.GroupID),
+			formatMilkyUserID(m.UserID),
+			formatMilkyUserID(m.OperatorID),
+			raw,
+		)
+	})
+
+	session.AddHandler(func(session2 *milky.Session, m *milky.FriendRequest) {
+		if m == nil {
+			return
+		}
+		log.Debugf("Received friend request: requestID=%s initiator=%d", m.RequestID, m.InitiatorID)
+
+		raw := map[string]any{
+			"request_id":   m.RequestID,
+			"time":         m.Time,
+			"is_filtered":  m.IsFiltered,
+			"initiator_id": m.InitiatorID,
+			"state":        m.State,
+		}
+		if m.Comment != "" {
+			raw["comment"] = m.Comment
+		}
+		if m.Via != "" {
+			raw["via"] = m.Via
+		}
+
+		pa.emitAdapterEvent(
+			"request",
+			"friend_request",
+			"",
+			m.Time,
+			"",
+			formatMilkyUserID(m.InitiatorID),
+			"",
+			raw,
+		)
+	})
+
+	session.AddHandler(func(session2 *milky.Session, m *milky.GroupInvitation) {
+		if m == nil {
+			return
+		}
+		log.Debugf("Received group invitation: requestID=%s group=%d initiator=%d", m.RequestID, m.GroupID, m.InitiatorID)
+
+		raw := map[string]any{
+			"request_id":   m.RequestID,
+			"time":         m.Time,
+			"is_filtered":  m.IsFiltered,
+			"initiator_id": m.InitiatorID,
+			"state":        m.State,
+			"group_id":     m.GroupID,
+		}
+
+		pa.emitAdapterEvent(
+			"request",
+			"group_invitation",
+			"",
+			m.Time,
+			formatMilkyGroupID(m.GroupID),
+			formatMilkyUserID(m.InitiatorID),
+			"",
+			raw,
+		)
+	})
+
+	session.AddHandler(func(session2 *milky.Session, m *milky.BotOffline) {
+		if m == nil {
+			return
+		}
+		log.Infof("Milky bot offline: reason=%s", m.Reason)
+
+		pa.emitAdapterEvent(
+			"meta_event",
+			"bot_offline",
+			"",
+			time.Now().Unix(),
+			"",
+			"",
+			"",
+			map[string]any{"reason": m.Reason},
+		)
 	})
 
 	err = session.Open()
@@ -906,6 +995,26 @@ func (pa *PlatformAdapterMilky) MsgRecall(request *MessageOperationRequest) (boo
 	return false, err
 }
 
+func (pa *PlatformAdapterMilky) emitAdapterEvent(postType, eventType, subType string, timestamp int64, groupID, userID, operatorID string, raw map[string]any) {
+	if pa.callback == nil {
+		return
+	}
+
+	evt := &AdapterEvent{
+		Platform:   "QQ",
+		PostType:   postType,
+		Type:       eventType,
+		SubType:    subType,
+		Time:       timestamp,
+		GroupID:    groupID,
+		UserID:     userID,
+		OperatorID: operatorID,
+		Raw:        raw,
+	}
+
+	pa.callback.OnEvent(evt)
+}
+
 // ExtractQQUserID 提取QQ用户ID
 func ExtractQQUserID(id string) string {
 	if strings.HasPrefix(id, "QQ:") {
@@ -920,6 +1029,20 @@ func ExtractQQGroupID(id string) string {
 		return id[9:]
 	}
 	return id
+}
+
+func formatMilkyUserID(id int64) string {
+	if id <= 0 {
+		return ""
+	}
+	return FormatDiceIDQQ(strconv.FormatInt(id, 10))
+}
+
+func formatMilkyGroupID(id int64) string {
+	if id <= 0 {
+		return ""
+	}
+	return FormatDiceIDQQGroup(strconv.FormatInt(id, 10))
 }
 
 // FriendDelete 删除好友

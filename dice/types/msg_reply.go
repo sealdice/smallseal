@@ -28,4 +28,6 @@ type MsgToReply struct {
 
 	Segments    MessageSegments `jsbind:"segment" json:"segments" yaml:"-"`
 	CommandData any             // 制定一个格式，返回一些更加本质的东西，到外面去二次套壳
+
+	CommandFormatInfo []*CommandFormatInfo
 }

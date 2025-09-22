@@ -8,6 +8,17 @@ import (
 	ds "github.com/sealdice/dicescript"
 )
 
+type LoadRecord struct {
+	Key string      `json:"key"`
+	Val *ds.VMValue `json:"val"`
+}
+
+type CommandFormatInfo struct {
+	Key         string        `json:"key"`
+	Text        string        `json:"text"`
+	LoadRecords []*LoadRecord `json:"loadRecords"`
+}
+
 type MsgContext struct {
 	CommandId int64
 	AdapterId string
@@ -32,11 +43,20 @@ type MsgContext struct {
 
 	vm   *ds.Context
 	Dice DiceLike
+
+	LoadRecords       []*LoadRecord
+	CommandFormatInfo []*CommandFormatInfo
+}
+
+func (ctx *MsgContext) LoadRecordFetchAndClear() []*LoadRecord {
+	records := ctx.LoadRecords
+	ctx.LoadRecords = nil
+	return records
 }
 
 func (ctx *MsgContext) GetVM() *ds.Context {
 	if ctx.vm == nil {
-		ctx.vm = newVM(ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem, ctx.TextTemplateMap)
+		ctx.vm = newVM(ctx, ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem, ctx.TextTemplateMap)
 	}
 	return ctx.vm
 }

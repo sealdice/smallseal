@@ -45,6 +45,8 @@ func ReplyRaw(ctx *types.MsgContext, msg *types.Message, text string, flag strin
 		Time:        msg.Time,
 		MessageType: messageType,
 		Segments:    types.MessageSegments{&types.TextElement{Content: text}},
+
+		CommandFormatInfo: ctx.CommandFormatInfo,
 	})
 }
 

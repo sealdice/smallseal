@@ -16,7 +16,8 @@ import (
 	"smallseal/dice/attrs"
 )
 
-func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2, textTemplate TextTemplateWithWeightDict) *ds.Context {
+func newVM(mctx *MsgContext, groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2, textTemplate TextTemplateWithWeightDict) *ds.Context {
+	// 搞了半天，终于还是把ctx传进来了
 	vm := ds.NewVM()
 
 	vm.Config.EnableDiceWoD = true
@@ -145,6 +146,10 @@ func newVM(groupId string, userId string, am *attrs.AttrsManager, gameSystem *Ga
 			curVal = doCompute(curVal)
 		}
 
+		mctx.LoadRecords = append(mctx.LoadRecords, &LoadRecord{
+			Key: name,
+			Val: curVal,
+		})
 		return curVal
 	}
 
