@@ -45,12 +45,14 @@ type GroupInfo struct {
 	Active           bool                                     `jsbind:"active"         json:"active"                yaml:"active"` // 是否在群内开启 - 过渡为象征意义
 	ActivatedExtList []*ExtInfo                               `json:"activatedExtList" yaml:"activatedExtList,flow"`               // 当前群开启的扩展列表
 	ExtListSnapshot  []string                                 `json:"-"                yaml:"-"`                                   // 存放当前激活的扩展表，无论其是否存在，用于处理插件重载后优先级混乱的问题
+	ExtActiveStates  *utils.SyncMap[string, bool]             `json:"extActiveStates"  yaml:"extActiveStates,flow"`                // 扩展激活状态映射表，key为扩展名，value为是否激活
 	Players          *utils.SyncMap[string, *GroupPlayerInfo] `json:"-"                yaml:"-"`                                   // 群员角色数据
 
-	GroupId         string                       `jsbind:"groupId"       json:"groupId"      yaml:"groupId"`
-	GuildID         string                       `jsbind:"guildId"       json:"guildId"      yaml:"guildId"`
-	ChannelID       string                       `jsbind:"channelId"     json:"channelId"    yaml:"channelId"`
-	GroupName       string                       `jsbind:"groupName"     json:"groupName"    yaml:"groupName"`
+	GroupId   string `jsbind:"groupId"       json:"groupId"      yaml:"groupId"`
+	GuildID   string `jsbind:"guildId"       json:"guildId"      yaml:"guildId"`
+	ChannelID string `jsbind:"channelId"     json:"channelId"    yaml:"channelId"`
+	GroupName string `jsbind:"groupName"     json:"groupName"    yaml:"groupName"`
+
 	DiceIDActiveMap *utils.SyncMap[string, bool] `json:"diceIdActiveMap" yaml:"diceIds,flow"` // 对应的骰子ID(格式 平台:ID)，对应单骰多号情况，例如骰A B都加了群Z，A退群不会影响B在群内服务
 	DiceIDExistsMap *utils.SyncMap[string, bool] `json:"diceIdExistsMap" yaml:"-"`            // 对应的骰子ID(格式 平台:ID)是否存在于群内
 	BotList         *utils.SyncMap[string, bool] `json:"botList"         yaml:"botList,flow"` // 其他骰子列表
@@ -85,4 +87,44 @@ type GroupInfo struct {
 	DefaultHelpGroup string `json:"defaultHelpGroup" yaml:"defaultHelpGroup"` // 当前群默认的帮助文档分组
 
 	PlayerGroups *utils.SyncMap[string, []string] `json:"playerGroups" yaml:"playerGroups"` // 供team指令使用并由其管理，与Players不同步
+}
+
+// IsExtensionActive 检查指定扩展是否在当前群组中激活
+func (g *GroupInfo) IsExtensionActive(extName string) bool {
+	if g.ExtActiveStates == nil {
+		return false
+	}
+	active, exists := g.ExtActiveStates.Load(extName)
+	return exists && active
+}
+
+// SetExtensionActive 设置指定扩展在当前群组中的激活状态
+func (g *GroupInfo) SetExtensionActive(extName string, active bool) {
+	if g.ExtActiveStates == nil {
+		g.ExtActiveStates = &utils.SyncMap[string, bool]{}
+	}
+	g.ExtActiveStates.Store(extName, active)
+}
+
+// GetActiveExtensions 获取当前群组中所有激活的扩展列表
+func (g *GroupInfo) GetActiveExtensions(allExtensions []*ExtInfo) []*ExtInfo {
+	var activeExts []*ExtInfo
+	for _, ext := range allExtensions {
+		// 检查扩展是否在激活状态映射表中被明确设置
+		if g.ExtActiveStates != nil {
+			if active, exists := g.ExtActiveStates.Load(ext.Name); exists {
+				if active {
+					activeExts = append(activeExts, ext)
+				}
+				continue
+			}
+		}
+		// 如果没有明确设置，则使用扩展的AutoActive属性
+		if ext.AutoActive {
+			activeExts = append(activeExts, ext)
+			// 同时将其状态记录到映射表中
+			g.SetExtensionActive(ext.Name, true)
+		}
+	}
+	return activeExts
 }

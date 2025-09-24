@@ -48,6 +48,7 @@ func NewDice() *Dice {
 
 	exts.RegisterBuiltinExtCore(d)
 	exts.RegisterBuiltinExtCoc7(d)
+	exts.RegisterBuiltinExtDnd5e(d)
 
 	return d
 }
@@ -77,9 +78,16 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 			System:  "coc7",
 		}
 
-		for _, ext := range d.ExtList {
-			groupInfo.ActivatedExtList = append(groupInfo.ActivatedExtList, ext)
+		// 初始化扩展激活状态映射表
+		groupInfo.ExtActiveStates = &utils.SyncMap[string, bool]{}
+		// 根据扩展的AutoActive属性设置初始激活状态
+		for _, ext := range d.GetExtList() {
+			if ext.AutoActive {
+				groupInfo.SetExtensionActive(ext.Name, true)
+			}
 		}
+		// 使用新的方法获取激活的扩展列表
+		groupInfo.ActivatedExtList = groupInfo.GetActiveExtensions(d.GetExtList())
 		d.GroupInfoManager.Store(msg.GroupID, groupInfo)
 	}
 
@@ -92,13 +100,16 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 
 	groupInfo.UpdatedAtTime = time.Now().Unix()
 
-	// 遍历 ext，获取指令列表
+	// 遍历激活的扩展，获取指令列表
 	cmdLst := []string{}
-	for _, ext := range groupInfo.ActivatedExtList {
+	activeExtensions := groupInfo.GetActiveExtensions(d.GetExtList())
+	for _, ext := range activeExtensions {
 		for cmd := range ext.CmdMap {
 			cmdLst = append(cmdLst, cmd)
 		}
 	}
+	// 更新ActivatedExtList以保持兼容性
+	groupInfo.ActivatedExtList = activeExtensions
 	sort.Sort(sort.Reverse(sort.StringSlice(cmdLst)))
 
 	platformPrefix := "QQ"
@@ -146,8 +157,14 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 	// Note(Szzrain): 赋值临时变量，不然有些地方没法用
 	// SetTempVars(mctx, msg.Sender.Nickname)
 
-	for _, _i := range mctx.Group.ActivatedExtList {
+	// 只遍历激活的扩展进行指令处理
+	for _, _i := range activeExtensions {
 		i := _i // 保留引用(我记得从go的什么版本开始不用如此处理了)
+		// 检查扩展是否真正激活
+		if !mctx.Group.IsExtensionActive(i.Name) {
+			continue
+		}
+
 		if i.OnNotCommandReceived != nil {
 			i.OnNotCommandReceived(mctx, msg)
 		}
@@ -181,4 +198,9 @@ func (d *Dice) GameSystemMapLoad(name string) (*types.GameSystemTemplateV2, erro
 		return gameSystem, nil
 	}
 	return nil, fmt.Errorf("game system not found: %s", name)
+}
+
+// GetExtList 获取扩展列表
+func (d *Dice) GetExtList() []*types.ExtInfo {
+	return d.ExtList
 }

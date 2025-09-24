@@ -544,8 +544,111 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 	cmdMap["rxh"] = cmdRollX
 	cmdMap["rhx"] = cmdRollX
 
+	helpExt := ".ext list // 查看所有扩展状态\n.ext on <扩展名> // 开启指定扩展\n.ext off <扩展名> // 关闭指定扩展"
+	cmdExt := &types.CmdItemInfo{
+		Name:      "ext",
+		ShortHelp: helpExt,
+		Help:      "扩展管理:\n" + helpExt,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+
+			if msg.MessageType != "group" {
+				ReplyToSender(ctx, msg, "扩展管理指令仅在群聊中可用")
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+
+			switch cmdArgs.GetArgN(1) {
+			case "list":
+				var result strings.Builder
+				result.WriteString("当前扩展状态:\n")
+				for _, ext := range ctx.Dice.GetExtList() {
+					status := "❌ 关闭"
+					if ctx.Group.IsExtensionActive(ext.Name) {
+						status = "✅ 开启"
+					}
+					result.WriteString(fmt.Sprintf("%s: %s\n", ext.Name, status))
+				}
+				ReplyToSender(ctx, msg, result.String())
+
+			case "on":
+				extName := cmdArgs.GetArgN(2)
+				if extName == "" {
+					ReplyToSender(ctx, msg, "请指定要开启的扩展名")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				// 查找扩展是否存在
+				var targetExt *types.ExtInfo
+				for _, ext := range ctx.Dice.GetExtList() {
+					if ext.Name == extName {
+						targetExt = ext
+						break
+					}
+				}
+
+				if targetExt == nil {
+					ReplyToSender(ctx, msg, fmt.Sprintf("未找到扩展: %s", extName))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				if ctx.Group.IsExtensionActive(extName) {
+					ReplyToSender(ctx, msg, fmt.Sprintf("扩展 %s 已经是开启状态", extName))
+				} else {
+					ctx.Group.SetExtensionActive(extName, true)
+					// 更新ActivatedExtList
+					ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+					ReplyToSender(ctx, msg, fmt.Sprintf("已开启扩展: %s", extName))
+				}
+
+			case "off":
+				extName := cmdArgs.GetArgN(2)
+				if extName == "" {
+					ReplyToSender(ctx, msg, "请指定要关闭的扩展名")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				// 不允许关闭core扩展
+				if extName == "core" {
+					ReplyToSender(ctx, msg, "核心扩展不能被关闭")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				// 查找扩展是否存在
+				var targetExt *types.ExtInfo
+				for _, ext := range ctx.Dice.GetExtList() {
+					if ext.Name == extName {
+						targetExt = ext
+						break
+					}
+				}
+
+				if targetExt == nil {
+					ReplyToSender(ctx, msg, fmt.Sprintf("未找到扩展: %s", extName))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				if !ctx.Group.IsExtensionActive(extName) {
+					ReplyToSender(ctx, msg, fmt.Sprintf("扩展 %s 已经是关闭状态", extName))
+				} else {
+					ctx.Group.SetExtensionActive(extName, false)
+					// 更新ActivatedExtList
+					ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+					ReplyToSender(ctx, msg, fmt.Sprintf("已关闭扩展: %s", extName))
+				}
+
+			default:
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
 	cmdMap["text"] = cmdText
 	cmdMap["bot"] = cmdBot
+	cmdMap["ext"] = cmdExt
 
 	theExt.CmdMap = cmdMap
 
