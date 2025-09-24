@@ -2,9 +2,11 @@ package adapters
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -262,9 +264,12 @@ func (pa *PlatformAdapterOB11) consumeSession(ctx context.Context, session *ob11
 			return err
 		}
 
-		if err := pa.dispatchFrame(payload); err != nil {
-			log.Debugf("ob11 frame dispatch failed: %v", err)
-		}
+		// 异步处理消息，避免阻塞WebSocket读取
+		go func(data []byte) {
+			if err := pa.dispatchFrame(data); err != nil {
+				log.Debugf("ob11 frame dispatch failed: %v", err)
+			}
+		}(payload)
 	}
 }
 
@@ -493,9 +498,15 @@ func (pa *PlatformAdapterOB11) callAction(ctx context.Context, action string, pa
 		return errors.New("ob11 adapter: no active API session")
 	}
 
-	echo := fmt.Sprintf("seal-%d", pa.requestSeq.Add(1))
+	// 生成随机值并转换为高进制
+	randomValue, _ := rand.Int(rand.Reader, big.NewInt(1<<32)) // 32位随机数
+	randomStr := randomValue.Text(62)                          // 转换为62进制（最高进制）
+	echo := fmt.Sprintf("seal-%s-%d", randomStr, pa.requestSeq.Add(1))
 	respCh := make(chan ob11APIResponse, 1)
-	pa.pending.Store(echo, respCh)
+	// 存储echo时需要考虑JSON序列化后的格式
+	echoJSON, _ := json.Marshal(echo)
+	echoKey := sanitizeRawMessage(echoJSON)
+	pa.pending.Store(echoKey, respCh)
 
 	payload := map[string]any{
 		"action": action,
@@ -504,18 +515,19 @@ func (pa *PlatformAdapterOB11) callAction(ctx context.Context, action string, pa
 	}
 
 	if err := session.writeJSON(payload); err != nil {
-		pa.pending.Delete(echo)
+		pa.pending.Delete(echoKey)
 		return err
 	}
 
 	select {
 	case <-ctx.Done():
-		pa.pending.Delete(echo)
+		pa.pending.Delete(echoKey)
 		return ctx.Err()
 	case <-time.After(actionTimeout):
-		pa.pending.Delete(echo)
+		pa.pending.Delete(echoKey)
 		return errors.New("ob11 adapter: action timeout")
 	case resp := <-respCh:
+
 		if resp.Status != "ok" {
 			if resp.Message != "" {
 				return fmt.Errorf("ob11 adapter: %s", resp.Message)
@@ -711,8 +723,10 @@ func (pa *PlatformAdapterOB11) GroupInfoGet(groupID any) (*GroupInfo, error) {
 	}
 
 	var resp struct {
-		GroupID   int64  `json:"group_id"`
-		GroupName string `json:"group_name"`
+		GroupID        int64  `json:"group_id"`
+		GroupName      string `json:"group_name"`
+		MemberCount    int64  `json:"member_count"`     // 成员数量
+		MaxMemberCount uint   `json:"max_member_count"` // 最大成员数量
 	}
 
 	if err := pa.callAction(context.Background(), "get_group_info", params, &resp); err != nil {
@@ -720,8 +734,10 @@ func (pa *PlatformAdapterOB11) GroupInfoGet(groupID any) (*GroupInfo, error) {
 	}
 
 	return &GroupInfo{
-		GroupID:   FormatDiceIDQQGroup(strconv.FormatInt(resp.GroupID, 10)),
-		GroupName: resp.GroupName,
+		GroupID:        FormatDiceIDQQGroup(strconv.FormatInt(resp.GroupID, 10)),
+		GroupName:      resp.GroupName,
+		MemberCount:    resp.MemberCount,
+		MaxMemberCount: uint(resp.MaxMemberCount),
 	}, nil
 }
 
@@ -984,6 +1000,18 @@ func sanitizeRawMessage(raw json.RawMessage) string {
 	return s
 }
 
+// getPendingKeys 获取pending map中的所有key，用于调试
+func (pa *PlatformAdapterOB11) getPendingKeys() []string {
+	var keys []string
+	pa.pending.Range(func(key, value interface{}) bool {
+		if k, ok := key.(string); ok {
+			keys = append(keys, k)
+		}
+		return true
+	})
+	return keys
+}
+
 type ob11BaseFrame struct {
 	PostType string          `json:"post_type"`
 	Echo     json.RawMessage `json:"echo"`
@@ -1094,4 +1122,172 @@ func (e *ob11EventEnvelope) channelID() string {
 
 func (e *ob11EventEnvelope) messageID() string {
 	return sanitizeRawMessage(e.MessageID)
+}
+
+// GroupFileList 获取群文件列表
+func (pa *PlatformAdapterOB11) GroupFileList(request *GroupFileListRequest) (*GroupFileListResponse, error) {
+	params := map[string]any{
+		"group_id": ExtractQQGroupID(formatAnyID(request.GroupID)),
+	}
+
+	// 根据 Lagrange OneBot 文档，使用不同的 API
+	var apiAction string
+	if request.FolderID == "" {
+		// 获取根目录文件列表
+		apiAction = "get_group_root_files"
+	} else {
+		// 获取指定文件夹的文件列表
+		apiAction = "get_group_files_by_folder"
+		params["folder_id"] = request.FolderID
+	}
+
+	var rawResponse json.RawMessage
+	ctx, cancel := context.WithTimeout(context.Background(), actionTimeout)
+	defer cancel()
+
+	fmt.Println("???", apiAction, params)
+	err := pa.callAction(ctx, apiAction, params, &rawResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group file list: %w", err)
+	}
+
+	// 解析响应数据
+	var ob11Response struct {
+		Files   []map[string]any `json:"files"`
+		Folders []map[string]any `json:"folders"`
+	}
+
+	if err := json.Unmarshal(rawResponse, &ob11Response); err != nil {
+		return nil, fmt.Errorf("failed to parse group file list response: %w", err)
+	}
+
+	// 转换为标准格式
+	response := &GroupFileListResponse{
+		Files:   make([]GroupFileInfo, 0, len(ob11Response.Files)),
+		Folders: make([]GroupFolderInfo, 0, len(ob11Response.Folders)),
+	}
+
+	// 转换文件信息
+	for _, file := range ob11Response.Files {
+		fileInfo := GroupFileInfo{}
+		if v, ok := file["file_id"].(string); ok {
+			fileInfo.FileID = v
+		}
+		if v, ok := file["file_name"].(string); ok {
+			fileInfo.FileName = v
+		}
+		if v, ok := file["busid"].(float64); ok {
+			fileInfo.BusID = int32(v)
+		}
+		if v, ok := file["file_size"].(float64); ok {
+			fileInfo.FileSize = int64(v)
+		}
+		if v, ok := file["upload_time"].(float64); ok {
+			fileInfo.UploadTime = int64(v)
+		}
+		if v, ok := file["dead_time"].(float64); ok {
+			fileInfo.DeadTime = int64(v)
+		}
+		if v, ok := file["modify_time"].(float64); ok {
+			fileInfo.ModifyTime = int64(v)
+		}
+		if v, ok := file["download_times"].(float64); ok {
+			fileInfo.DownloadTimes = int32(v)
+		}
+		if v, ok := file["uploader"].(float64); ok {
+			fileInfo.Uploader = int64(v)
+		}
+		if v, ok := file["uploader_name"].(string); ok {
+			fileInfo.UploaderName = v
+		}
+		response.Files = append(response.Files, fileInfo)
+	}
+
+	// 转换文件夹信息
+	for _, folder := range ob11Response.Folders {
+		folderInfo := GroupFolderInfo{}
+		if v, ok := folder["folder_id"].(string); ok {
+			folderInfo.FolderID = v
+		}
+		if v, ok := folder["folder_name"].(string); ok {
+			folderInfo.FolderName = v
+		}
+		if v, ok := folder["create_time"].(float64); ok {
+			folderInfo.CreateTime = int64(v)
+		}
+		if v, ok := folder["creator"].(float64); ok {
+			folderInfo.Creator = int64(v)
+		}
+		if v, ok := folder["creator_name"].(string); ok {
+			folderInfo.CreatorName = v
+		}
+		if v, ok := folder["total_file_count"].(float64); ok {
+			folderInfo.TotalFileCount = int32(v)
+		}
+		response.Folders = append(response.Folders, folderInfo)
+	}
+
+	return response, nil
+}
+
+// GroupFileDownload 获取群文件下载链接
+func (pa *PlatformAdapterOB11) GroupFileDownload(request *GroupFileDownloadRequest) (*GroupFileDownloadResponse, error) {
+	params := map[string]any{
+		"group_id": ExtractQQGroupID(formatAnyID(request.GroupID)),
+		"file_id":  request.FileID,
+	}
+
+	// busid参数在Lagrange OneBot中已废弃，但为了兼容性仍然包含
+	if request.BusID != 0 {
+		params["busid"] = request.BusID
+	}
+
+	var rawResponse json.RawMessage
+	ctx, cancel := context.WithTimeout(context.Background(), actionTimeout)
+	defer cancel()
+
+	err := pa.callAction(ctx, "get_group_file_url", params, &rawResponse)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group file download url: %w", err)
+	}
+
+	// 解析响应数据
+	var ob11Response struct {
+		URL string `json:"url"`
+	}
+
+	if err := json.Unmarshal(rawResponse, &ob11Response); err != nil {
+		return nil, fmt.Errorf("failed to parse group file download response: %w", err)
+	}
+
+	return &GroupFileDownloadResponse{
+		URL: ob11Response.URL,
+	}, nil
+}
+
+// GroupFileUpload 上传文件到群
+func (pa *PlatformAdapterOB11) GroupFileUpload(request *GroupFileUploadRequest) (bool, error) {
+	params := map[string]any{
+		"group_id": ExtractQQGroupID(formatAnyID(request.GroupID)),
+		"file":     request.FilePath, // 仅支持本地文件路径
+		"name":     request.FileName, // 文件名称为必需参数
+	}
+
+	// 如果指定了文件夹ID，添加到参数中，默认为根目录
+	if request.FolderID != "" {
+		params["folder"] = request.FolderID
+	} else {
+		params["folder"] = "/" // 默认上传到根目录
+	}
+
+	var rawResponse json.RawMessage
+	ctx, cancel := context.WithTimeout(context.Background(), actionTimeout)
+	defer cancel()
+
+	err := pa.callAction(ctx, "upload_group_file", params, &rawResponse)
+	if err != nil {
+		return false, fmt.Errorf("failed to upload group file: %w", err)
+	}
+
+	return true, nil
 }

@@ -34,6 +34,11 @@ type PlatformAdapter interface {
 	FriendDelete(request *FriendOperationRequest) (bool, error)
 	FriendAdd(request *FriendOperationRequest) (bool, error)
 
+	// 群文件操作 - 扩展区，不用实现
+	GroupFileList(request *GroupFileListRequest) (*GroupFileListResponse, error)
+	GroupFileDownload(request *GroupFileDownloadRequest) (*GroupFileDownloadResponse, error)
+	GroupFileUpload(request *GroupFileUploadRequest) (bool, error)
+
 	SetCallback(callback AdapterCallback)
 }
 
