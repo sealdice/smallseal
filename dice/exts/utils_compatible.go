@@ -11,7 +11,7 @@ import (
 	ds "github.com/sealdice/dicescript"
 	"golang.org/x/exp/rand"
 
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 type RollExtraFlags struct {

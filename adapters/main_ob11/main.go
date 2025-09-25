@@ -11,9 +11,9 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"smallseal/adapters"
-	"smallseal/dice"
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/adapters"
+	"github.com/sealdice/smallseal/dice"
+	"github.com/sealdice/smallseal/dice/types"
 
 	"go.uber.org/zap"
 )

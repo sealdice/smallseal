@@ -8,7 +8,7 @@ import (
 
 	ds "github.com/sealdice/dicescript"
 
-	"smallseal/utils"
+	"github.com/sealdice/smallseal/utils"
 )
 
 type AttrsManager struct {

@@ -1,8 +1,8 @@
 package dice
 
 import (
-	"smallseal/dice/types"
-	"smallseal/utils"
+	"github.com/sealdice/smallseal/dice/types"
+	"github.com/sealdice/smallseal/utils"
 )
 
 // GroupInfoManager 群组信息管理器接口

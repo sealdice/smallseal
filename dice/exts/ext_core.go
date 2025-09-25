@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 
 	ds "github.com/sealdice/dicescript"
 )

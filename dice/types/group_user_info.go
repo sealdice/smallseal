@@ -4,7 +4,7 @@ import (
 	"github.com/sealdice/dicescript"
 	"golang.org/x/time/rate"
 
-	"smallseal/utils"
+	"github.com/sealdice/smallseal/utils"
 )
 
 // GroupPlayerInfoBase 群内玩家信息

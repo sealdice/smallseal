@@ -13,7 +13,7 @@ import (
 	"github.com/samber/lo"
 	ds "github.com/sealdice/dicescript"
 
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 // 先屏蔽掉这两个

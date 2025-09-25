@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 func (d *Dice) RegisterExtension(extInfo *types.ExtInfo) {

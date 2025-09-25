@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"smallseal/adapters"
-	"smallseal/dice"
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/adapters"
+	"github.com/sealdice/smallseal/dice"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 type AdapterCallbackBase2 struct {

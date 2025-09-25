@@ -13,7 +13,7 @@ import (
 	ds "github.com/sealdice/dicescript"
 	"gopkg.in/yaml.v3"
 
-	"smallseal/utils"
+	"github.com/sealdice/smallseal/utils"
 )
 
 // GameSystemTemplateV2 新版本的游戏系统模板结构

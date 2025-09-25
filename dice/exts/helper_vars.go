@@ -12,7 +12,7 @@ import (
 	ds "github.com/sealdice/dicescript"
 	"golang.org/x/exp/rand"
 
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 func VarSetValueStr(ctx *types.MsgContext, s string, v string) {

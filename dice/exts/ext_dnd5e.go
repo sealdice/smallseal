@@ -12,8 +12,8 @@ import (
 
 	ds "github.com/sealdice/dicescript"
 
-	"smallseal/dice/attrs"
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/attrs"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 type (

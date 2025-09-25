@@ -3,11 +3,12 @@ package adapters
 import (
 	"fmt"
 	"path/filepath"
-	"smallseal/dice/types"
-	"smallseal/utils"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sealdice/smallseal/dice/types"
+	"github.com/sealdice/smallseal/utils"
 
 	milky "github.com/Szzrain/Milky-go-sdk"
 	"go.uber.org/zap"
@@ -1121,4 +1122,30 @@ func (pa *PlatformAdapterMilky) FriendAdd(request *FriendOperationRequest) (bool
 		pa.callback.OnError(err)
 	}
 	return false, err
+}
+
+// GroupFileList 获取群文件列表 - 占位符实现
+func (pa *PlatformAdapterMilky) GroupFileList(request *GroupFileListRequest) (*GroupFileListResponse, error) {
+	log := zap.S().Named("adapter")
+
+	// TODO: 实现 Milky SDK 的群文件列表获取功能
+	err := fmt.Errorf("group file list not implemented for Milky adapter")
+	log.Warn(err.Error())
+	if pa.callback != nil {
+		pa.callback.OnError(err)
+	}
+	return nil, err
+}
+
+// GroupFileDownload 获取群文件下载链接 - 占位符实现
+func (pa *PlatformAdapterMilky) GroupFileDownload(request *GroupFileDownloadRequest) (*GroupFileDownloadResponse, error) {
+	log := zap.S().Named("adapter")
+
+	// TODO: 实现 Milky SDK 的群文件下载功能
+	err := fmt.Errorf("group file download not implemented for Milky adapter")
+	log.Warn(err.Error())
+	if pa.callback != nil {
+		pa.callback.OnError(err)
+	}
+	return nil, err
 }

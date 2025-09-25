@@ -1,6 +1,6 @@
 package adapters
 
-import "smallseal/dice/types"
+import "github.com/sealdice/smallseal/dice/types"
 
 type RequestBase struct {
 	MessageId string // 消息ID
@@ -135,6 +135,7 @@ type GroupFileInfo struct {
 	DownloadTimes int32  `json:"download_times"` // 下载次数
 	Uploader      int64  `json:"uploader"`       // 上传者QQ号
 	UploaderName  string `json:"uploader_name"`  // 上传者名称
+	FolderPath    string `json:"folder_path"`    // 文件夹路径
 }
 
 // GroupFolderInfo 群文件夹信息

@@ -6,7 +6,7 @@ import (
 
 	"github.com/samber/lo"
 
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 // SetCardType 这几个先不动，后面改名字或者移除

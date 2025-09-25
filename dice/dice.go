@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"smallseal/dice/attrs"
-	"smallseal/dice/exts"
-	"smallseal/dice/types"
-	"smallseal/utils"
+	"github.com/sealdice/smallseal/dice/attrs"
+	"github.com/sealdice/smallseal/dice/exts"
+	"github.com/sealdice/smallseal/dice/types"
+	"github.com/sealdice/smallseal/utils"
 )
 
 type Dice struct {

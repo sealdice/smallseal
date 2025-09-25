@@ -1,8 +1,8 @@
 package types
 
 import (
-	"smallseal/dice/attrs"
-	"smallseal/utils"
+	"github.com/sealdice/smallseal/dice/attrs"
+	"github.com/sealdice/smallseal/utils"
 
 	"github.com/samber/lo"
 	ds "github.com/sealdice/dicescript"

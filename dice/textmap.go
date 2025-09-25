@@ -1,6 +1,6 @@
 package dice
 
-import "smallseal/dice/types"
+import "github.com/sealdice/smallseal/dice/types"
 
 var DefaultTextMap = types.TextTemplateWithWeightDict{
 	"COC": {

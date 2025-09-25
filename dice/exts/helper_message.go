@@ -1,7 +1,7 @@
 package exts
 
 import (
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 func ReplyToSenderRaw(ctx *types.MsgContext, msg *types.Message, text string, flag string) {

@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"smallseal/dice/attrs"
-	"smallseal/dice/types"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/sealdice/smallseal/dice/attrs"
+	"github.com/sealdice/smallseal/dice/types"
 
 	"github.com/samber/lo"
 	ds "github.com/sealdice/dicescript"

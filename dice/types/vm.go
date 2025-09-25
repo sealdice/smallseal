@@ -13,7 +13,7 @@ import (
 
 	ds "github.com/sealdice/dicescript"
 
-	"smallseal/dice/attrs"
+	"github.com/sealdice/smallseal/dice/attrs"
 )
 
 func newVM(mctx *MsgContext, groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2, textTemplate TextTemplateWithWeightDict) *ds.Context {

@@ -1,10 +1,10 @@
-module smallseal
+module github.com/sealdice/smallseal
 
 go 1.24.6
 
 require (
 	github.com/Szzrain/Milky-go-sdk v0.3.9
-	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/peterh/liner v1.2.2
 	github.com/samber/lo v1.51.0
 	github.com/sealdice/dicescript v0.0.0-20250903023101-e8c6e09caab2
@@ -15,7 +15,6 @@ require (
 )
 
 require (
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/mattn/go-runewidth v0.0.3 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect

@@ -8,8 +8,8 @@ import (
 
 	"github.com/peterh/liner"
 
-	"smallseal/dice"
-	"smallseal/dice/types"
+	"github.com/sealdice/smallseal/dice"
+	"github.com/sealdice/smallseal/dice/types"
 )
 
 var (
