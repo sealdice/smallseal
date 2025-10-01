@@ -15,24 +15,11 @@ type SimpleUserInfo struct {
 type AdapterCallback interface {
 	OnError(err error)
 	OnMessageReceived(info *MessageSendCallbackInfo)
-	OnEvent(evt *AdapterEvent)
+	OnEvent(evt *types.AdapterEvent)
 }
 
 // AdapterEvent captures non-message events pushed from platform adapters.
-type AdapterEvent struct {
-	Platform   string         // 源平台标识，如 QQ
-	PostType   string         // 原始 post_type，例如 notice/request
-	Type       string         // 事件类型，例如 group_increase
-	SubType    string         // 事件子类型
-	Time       int64          // 事件发生时间戳
-	GroupID    string         // 相关群 ID（Dice 格式）
-	GuildID    string         // 相关频道服务器 ID
-	ChannelID  string         // 相关频道 ID
-	UserID     string         // 相关用户 ID
-	OperatorID string         // 操作者 ID
-	Raw        map[string]any // 原始事件数据，便于扩展
-}
-
+// 定义移动至 dice/types 以便核心逻辑复用。
 // MessageSendRequest 发送消息请求
 type MessageSendRequest struct {
 	RequestBase

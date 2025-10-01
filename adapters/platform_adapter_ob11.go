@@ -335,8 +335,8 @@ func (pa *PlatformAdapterOB11) dispatchFrame(payload []byte) error {
 	return nil
 }
 
-func (pa *PlatformAdapterOB11) convertFrameToEvent(postType string, payload []byte) (*AdapterEvent, error) {
-	evt := &AdapterEvent{
+func (pa *PlatformAdapterOB11) convertFrameToEvent(postType string, payload []byte) (*types.AdapterEvent, error) {
+	evt := &types.AdapterEvent{
 		Platform: "QQ",
 		PostType: postType,
 	}

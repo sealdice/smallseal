@@ -33,6 +33,14 @@ func (cb *AdapterCallbackBase2) OnMessageReceived(info *adapters.MessageSendCall
 		cb.dice.Execute("", info.Message)
 	}
 }
+func (cb *AdapterCallbackBase2) OnEvent(evt *types.AdapterEvent) {
+	if evt == nil {
+		return
+	}
+	if cb.dice != nil {
+		cb.dice.DispatchEvent("", evt)
+	}
+}
 
 func NewMilkyConnItem() *adapters.PlatformAdapterMilky {
 	adapter := &adapters.PlatformAdapterMilky{

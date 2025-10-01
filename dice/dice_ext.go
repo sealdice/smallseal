@@ -76,3 +76,7 @@ func (d *Dice) ExtFind(s string, fromJS bool) *types.ExtInfo {
 	}
 	return ext
 }
+
+func (d *Dice) GetExtList() []*types.ExtInfo {
+	return d.ExtList
+}

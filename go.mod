@@ -8,6 +8,7 @@ require (
 	github.com/peterh/liner v1.2.2
 	github.com/samber/lo v1.51.0
 	github.com/sealdice/dicescript v0.0.0-20250903023101-e8c6e09caab2
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
 	golang.org/x/time v0.12.0
@@ -15,7 +16,9 @@ require (
 )
 
 require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/mattn/go-runewidth v0.0.3 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.22.0 // indirect

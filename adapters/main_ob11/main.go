@@ -40,17 +40,22 @@ func (cb *ob11Callback) OnMessageReceived(info *adapters.MessageSendCallbackInfo
 	}
 }
 
-func (cb *ob11Callback) OnEvent(evt *adapters.AdapterEvent) {
+func (cb *ob11Callback) OnEvent(evt *types.AdapterEvent) {
+	if evt == nil {
+		return
+	}
 	if evt.Type == "heartbeat" {
 		return
 	}
-
 	jsonEvt, err := json.Marshal(evt)
 	if err != nil {
 		fmt.Printf("OnEvent: marshal err, evt=%v, err=%v\n", evt, err)
 		return
 	}
 	fmt.Printf("OnEvent: %s\n", string(jsonEvt))
+	if cb.dice != nil {
+		cb.dice.DispatchEvent("", evt)
+	}
 }
 
 func newOB11ConnItem() *adapters.PlatformAdapterOB11 {

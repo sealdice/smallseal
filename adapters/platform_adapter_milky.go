@@ -1001,7 +1001,7 @@ func (pa *PlatformAdapterMilky) emitAdapterEvent(postType, eventType, subType st
 		return
 	}
 
-	evt := &AdapterEvent{
+	evt := &types.AdapterEvent{
 		Platform:   "QQ",
 		PostType:   postType,
 		Type:       eventType,
