@@ -7,6 +7,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/sealdice/smallseal/dice/types"
+	"github.com/sealdice/smallseal/utils"
 )
 
 // SetCardType 这几个先不动，后面改名字或者移除
@@ -86,24 +87,49 @@ func GetCtxProxyAtPosRaw(ctx *types.MsgContext, cmdArgs *types.CmdArgs, pos int,
 			}
 		}
 
-		// TODO: 感觉比较抽象，为啥这个在atInfo里？
-		// 原来是有个这样的取值 p := ctx.Group.PlayerGet(ctx.Dice.DBOperator, i.UserID) 先简略一下
-		// mctx, _ := i.CopyCtx(ctx)
 		mctx := ctx.Copy()
-		mctx.Player.UserId = i.UserID
-
-		if setTempVar {
-			if mctx.Player != ctx.Player {
-				SetTempVars(mctx, "???")
+		var targetPlayer *types.GroupPlayerInfo
+		if ctx.Group != nil {
+			ctx.Group.EnsureBotList()
+			if ctx.Group.Players == nil {
+				ctx.Group.Players = &utils.SyncMap[string, *types.GroupPlayerInfo]{}
+			}
+			if stored, ok := ctx.Group.Players.Load(i.UserID); ok {
+				targetPlayer = stored
 			} else {
-				SetTempVars(mctx, mctx.Player.Name)
+				targetPlayer = &types.GroupPlayerInfo{
+					UserId:       i.UserID,
+					Name:         i.UserID,
+					DiceSideExpr: ctx.Group.DiceSideExpr,
+				}
+				ctx.Group.Players.Store(i.UserID, targetPlayer)
+			}
+		} else {
+			targetPlayer = &types.GroupPlayerInfo{
+				UserId: i.UserID,
+				Name:   i.UserID,
 			}
 		}
-
-		if mctx.Player.UserId == ctx.Player.UserId {
-			// 并非代骰
-			ctx.DelegateText = ""
+		if targetPlayer.Name == "" {
+			targetPlayer.Name = i.UserID
 		}
+		targetPlayer.InGroup = true
+		mctx.Player = targetPlayer
+
+		if setTempVar {
+			SetTempVars(mctx, targetPlayer.Name)
+		}
+
+		if targetPlayer.UserId != ctx.Player.UserId {
+			delegateBy := ctx.Player.Name
+			if delegateBy == "" {
+				delegateBy = ctx.Player.UserId
+			}
+			mctx.DelegateText = fmt.Sprintf("（由%s代骰）", delegateBy)
+		} else {
+			mctx.DelegateText = ""
+		}
+		ctx.DelegateText = ""
 		return mctx
 	}
 	ctx.DelegateText = ""

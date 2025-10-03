@@ -1,6 +1,8 @@
 package types
 
 import (
+	"strings"
+
 	"github.com/sealdice/dicescript"
 	"golang.org/x/time/rate"
 
@@ -127,4 +129,73 @@ func (g *GroupInfo) GetActiveExtensions(allExtensions []*ExtInfo) []*ExtInfo {
 		}
 	}
 	return activeExts
+}
+
+func (g *GroupInfo) ensureExtStates() {
+	if g.ExtActiveStates == nil {
+		g.ExtActiveStates = &utils.SyncMap[string, bool]{}
+	}
+	if g.ActivatedExtList == nil {
+		g.ActivatedExtList = []*ExtInfo{}
+	}
+}
+
+// ExtActive 标记扩展为启用状态，并维护 ActivatedExtList
+func (g *GroupInfo) ExtActive(ext *ExtInfo) {
+	if ext == nil {
+		return
+	}
+	g.ensureExtStates()
+	g.ExtActiveStates.Store(ext.Name, true)
+	found := false
+	for idx, existing := range g.ActivatedExtList {
+		if existing != nil && existing.Name == ext.Name {
+			g.ActivatedExtList[idx] = ext
+			found = true
+			break
+		}
+	}
+	if !found {
+		g.ActivatedExtList = append(g.ActivatedExtList, ext)
+	}
+}
+
+// ExtInactiveByName 关闭指定扩展，并返回被关闭的扩展信息
+func (g *GroupInfo) ExtInactiveByName(name string) *ExtInfo {
+	if name == "" {
+		return nil
+	}
+	g.ensureExtStates()
+	g.ExtActiveStates.Store(name, false)
+	var removed *ExtInfo
+	newList := make([]*ExtInfo, 0, len(g.ActivatedExtList))
+	for _, ext := range g.ActivatedExtList {
+		if ext == nil {
+			continue
+		}
+		if strings.EqualFold(ext.Name, name) {
+			removed = ext
+			continue
+		}
+		newList = append(newList, ext)
+	}
+	g.ActivatedExtList = newList
+	return removed
+}
+
+// ExtGetActive 返回已启用的扩展信息
+func (g *GroupInfo) ExtGetActive(name string) *ExtInfo {
+	for _, ext := range g.ActivatedExtList {
+		if ext != nil && strings.EqualFold(ext.Name, name) {
+			return ext
+		}
+	}
+	return nil
+}
+
+// EnsureBotList 确保机器人列表被初始化
+func (g *GroupInfo) EnsureBotList() {
+	if g.BotList == nil {
+		g.BotList = &utils.SyncMap[string, bool]{}
+	}
 }

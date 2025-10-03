@@ -3,6 +3,7 @@ package dice
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -31,6 +32,8 @@ type Dice struct {
 	Config struct {
 		CommandPrefix []string
 	}
+
+	masterList utils.SyncMap[string, bool]
 }
 
 func NewDice() *Dice {
@@ -39,6 +42,8 @@ func NewDice() *Dice {
 		GroupInfoManager: NewDefaultGroupInfoManager(),
 
 		CallbackForSendMsg: utils.SyncMap[string, func(msg *types.MsgToReply)]{},
+
+		masterList: utils.SyncMap[string, bool]{},
 	}
 
 	d.attrsManager.Init()
@@ -66,7 +71,7 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 		return
 	}
 
-	mctx := &types.MsgContext{Dice: d, AdapterId: adapterId, TextTemplateMap: DefaultTextMap}
+	mctx := &types.MsgContext{Dice: d, AdapterId: adapterId, TextTemplateMap: DefaultTextMap, FallbackTextTemplate: DefaultTextMap}
 	mctx.AttrsManager = d.attrsManager
 
 	msg.Message = msg.Segments.ToText()
@@ -80,9 +85,12 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 		groupInfo = &types.GroupInfo{
 			GroupId: msg.GroupID,
 			System:  "coc7",
+			Active:  true,
 		}
 
 		groupInfo.ExtActiveStates = &utils.SyncMap[string, bool]{}
+		groupInfo.BotList = &utils.SyncMap[string, bool]{}
+		groupInfo.Players = &utils.SyncMap[string, *types.GroupPlayerInfo]{}
 		for _, ext := range d.GetExtList() {
 			if ext.AutoActive {
 				groupInfo.SetExtensionActive(ext.Name, true)
@@ -92,12 +100,30 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 		d.GroupInfoManager.Store(msg.GroupID, groupInfo)
 	}
 
+	if groupInfo.BotList == nil {
+		groupInfo.BotList = &utils.SyncMap[string, bool]{}
+	}
+	if groupInfo.Players == nil {
+		groupInfo.Players = &utils.SyncMap[string, *types.GroupPlayerInfo]{}
+	}
+
 	mctx.GameSystem, _ = d.gameSystem.Load(groupInfo.System)
 	mctx.Group = groupInfo
-	mctx.Player = &types.GroupPlayerInfo{
-		UserId: msg.Sender.UserID,
-		Name:   msg.Sender.Nickname,
+
+	mctx.IsCurGroupBotOn = groupInfo.Active
+
+	player, exists := groupInfo.Players.Load(msg.Sender.UserID)
+	if !exists {
+		player = &types.GroupPlayerInfo{
+			UserId: msg.Sender.UserID,
+			Name:   msg.Sender.Nickname,
+		}
+		groupInfo.Players.Store(msg.Sender.UserID, player)
+	} else if msg.Sender.Nickname != "" {
+		player.Name = msg.Sender.Nickname
 	}
+	player.InGroup = msg.MessageType == "group"
+	mctx.Player = player
 
 	groupInfo.UpdatedAtTime = time.Now().Unix()
 
@@ -123,25 +149,100 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 		mctx.CommandId = d.getNextCommandID()
 	}
 
+	sendHelp := func(cmd *types.CmdItemInfo) {
+		helpText := ""
+		if cmd.HelpFunc != nil {
+			helpText = cmd.HelpFunc(false)
+		}
+		if helpText == "" {
+			helpText = cmd.Help
+		}
+		if helpText == "" {
+			short := strings.TrimSpace(cmd.ShortHelp)
+			if short != "" {
+				helpText = fmt.Sprintf("%s:\n%s", cmd.Name, short)
+			} else {
+				helpText = fmt.Sprintf("%s 指令暂无帮助信息", cmd.Name)
+			}
+		}
+		exts.ReplyToSender(mctx, msg, helpText)
+	}
+
+	solved := false
+	allowWhenInactive := func(cmd *types.CmdItemInfo) bool {
+		if cmd == nil {
+			return false
+		}
+		switch strings.ToLower(cmd.Name) {
+		case "bot", "dismiss":
+			return true
+		default:
+			return false
+		}
+	}
+
+	groupActive := mctx.Group == nil || mctx.Group.Active
+
 	for _, _i := range activeExtensions {
 		i := _i
-		if !mctx.Group.IsExtensionActive(i.Name) {
+		if mctx.Group != nil && !mctx.Group.IsExtensionActive(i.Name) {
 			continue
 		}
 
-		if i.OnNotCommandReceived != nil {
+		if groupActive && i.OnNotCommandReceived != nil {
 			i.OnNotCommandReceived(mctx, msg)
 		}
-		if i.OnCommandReceived != nil && cmdArgs != nil {
+		if groupActive && i.OnCommandReceived != nil && cmdArgs != nil {
 			i.OnCommandReceived(mctx, msg, cmdArgs)
 		}
 
-		if cmdArgs != nil {
+		if cmdArgs != nil && !solved {
 			if cmd, ok := i.CmdMap[cmdArgs.Command]; ok {
-				cmd.Solve(mctx, msg, cmdArgs)
+				if !groupActive && !allowWhenInactive(cmd) {
+					continue
+				}
+				result := cmd.Solve(mctx, msg, cmdArgs)
+				if result.Solved {
+					solved = true
+					if result.ShowHelp {
+						sendHelp(cmd)
+					}
+				}
 			}
 		}
 	}
+}
+
+func (d *Dice) MasterAdd(uid string) {
+	if uid == "" {
+		return
+	}
+	d.masterList.Store(uid, true)
+}
+
+func (d *Dice) MasterRemove(uid string) bool {
+	if uid == "" {
+		return false
+	}
+	return d.masterList.Delete(uid)
+}
+
+func (d *Dice) ListMasters() []string {
+	masters := make([]string, 0)
+	d.masterList.Range(func(key string, _ bool) bool {
+		masters = append(masters, key)
+		return true
+	})
+	sort.Strings(masters)
+	return masters
+}
+
+func (d *Dice) IsMaster(uid string) bool {
+	if uid == "" {
+		return false
+	}
+	_, exists := d.masterList.Load(uid)
+	return exists
 }
 
 func (d *Dice) SendReply(msg *types.MsgToReply) {

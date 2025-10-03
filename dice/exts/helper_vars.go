@@ -284,6 +284,12 @@ func SetTempVars(ctx *types.MsgContext, qqNickname string) {
 		// } else {
 		// 	VarSetValueStr(ctx, "$t消息类型", "private")
 	}
+
+	if ctx.DelegateText != "" {
+		VarSetValueStr(ctx, "$t代骰信息", ctx.DelegateText)
+	} else {
+		VarSetValueStr(ctx, "$t代骰信息", "")
+	}
 }
 
 func DiceFormatTmpl(ctx *types.MsgContext, s string) string {

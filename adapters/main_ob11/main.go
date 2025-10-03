@@ -35,12 +35,6 @@ func (cb *ob11Callback) OnMessageReceived(info *adapters.MessageSendCallbackInfo
 	}
 	fmt.Printf("OnMessageReceived: %s, msg=%s\n", string(jsonInfo), info.Message.Segments.ToText())
 
-	if info.Sender != nil {
-		if info.Message.GroupID != "QQ-Group:578800173" {
-			return
-		}
-	}
-
 	if cb.dice != nil && info.Message != nil {
 		cb.dice.Execute("", info.Message)
 	}

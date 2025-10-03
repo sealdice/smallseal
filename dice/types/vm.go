@@ -16,7 +16,15 @@ import (
 	"github.com/sealdice/smallseal/dice/attrs"
 )
 
-func newVM(mctx *MsgContext, groupId string, userId string, am *attrs.AttrsManager, gameSystem *GameSystemTemplateV2, textTemplate TextTemplateWithWeightDict) *ds.Context {
+func newVM(
+	mctx *MsgContext,
+	groupId string,
+	userId string,
+	am *attrs.AttrsManager,
+	gameSystem *GameSystemTemplateV2,
+	textTemplate TextTemplateWithWeightDict,
+	defaultTextTemplate TextTemplateWithWeightDict,
+) *ds.Context {
 	// 搞了半天，终于还是把ctx传进来了
 	vm := ds.NewVM()
 
@@ -167,14 +175,25 @@ func newVM(mctx *MsgContext, groupId string, userId string, am *attrs.AttrsManag
 
 		// TODO: 规则模板中的读取拦截
 
+		// 检查textMap变量，但这个可能与format有点重复，有些犹豫
 		if curVal == nil {
 			parts := strings.SplitN(nameOrigin, ":", 2)
 			if len(parts) == 2 {
-				items := textTemplate[parts[0]][parts[1]]
-				rand.Seed(uint64(time.Now().UnixNano()))
-				idx := rand.Intn(len(items))
-				text := items[idx][0].(string)
-				curVal = ds.NewComputedVal("\x1e" + text + "\x1e")
+				var items []TextTemplateItem
+				if cat, ok := textTemplate[parts[0]]; ok {
+					items = cat[parts[1]]
+				}
+				if len(items) == 0 && defaultTextTemplate != nil {
+					if cat, ok := defaultTextTemplate[parts[0]]; ok {
+						items = cat[parts[1]]
+					}
+				}
+				if len(items) > 0 {
+					rand.Seed(uint64(time.Now().UnixNano()))
+					idx := rand.Intn(len(items))
+					text := items[idx][0].(string)
+					curVal = ds.NewComputedVal("\x1e" + text + "\x1e")
+				}
 			}
 		}
 

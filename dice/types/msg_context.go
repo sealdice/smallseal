@@ -36,7 +36,8 @@ type MsgContext struct {
 	AttrsManager *attrs.AttrsManager
 	GameSystem   *GameSystemTemplateV2
 
-	TextTemplateMap TextTemplateWithWeightDict
+	TextTemplateMap      TextTemplateWithWeightDict
+	FallbackTextTemplate TextTemplateWithWeightDict
 
 	CommandInfo  map[string]any
 	DelegateText string
@@ -56,7 +57,7 @@ func (ctx *MsgContext) LoadRecordFetchAndClear() []*LoadRecord {
 
 func (ctx *MsgContext) GetVM() *ds.Context {
 	if ctx.vm == nil {
-		ctx.vm = newVM(ctx, ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem, ctx.TextTemplateMap)
+		ctx.vm = newVM(ctx, ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem, ctx.TextTemplateMap, ctx.FallbackTextTemplate)
 	}
 	return ctx.vm
 }

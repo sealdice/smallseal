@@ -17,14 +17,14 @@ import (
 )
 
 type stubDice struct {
-	templates map[string]*types.GameSystemTemplateV2
-	replies   []*types.MsgToReply
+	templates  map[string]*types.GameSystemTemplateV2
+	replies    []*types.MsgToReply
 	extensions map[string]*types.ExtInfo
 }
 
 func newStubDice(tmpl *types.GameSystemTemplateV2) *stubDice {
 	return &stubDice{
-		templates: map[string]*types.GameSystemTemplateV2{tmpl.Name: tmpl},
+		templates:  map[string]*types.GameSystemTemplateV2{tmpl.Name: tmpl},
 		extensions: make(map[string]*types.ExtInfo),
 	}
 }
@@ -70,6 +70,14 @@ func (s *stubDice) RegisterEventHook(string, types.HookPriority, types.EventHook
 func (s *stubDice) UnregisterEventHook(types.HookHandle) bool { return true }
 
 func (s *stubDice) DispatchEvent(string, *types.AdapterEvent) {}
+
+func (s *stubDice) MasterAdd(string) {}
+
+func (s *stubDice) MasterRemove(string) bool { return false }
+
+func (s *stubDice) ListMasters() []string { return nil }
+
+func (s *stubDice) IsMaster(string) bool { return false }
 
 func minimalTextMap() types.TextTemplateWithWeightDict {
 	toItem := func(text string) types.TextTemplateItem {

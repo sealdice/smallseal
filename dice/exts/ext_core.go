@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sealdice/smallseal/dice/types"
 
@@ -281,8 +284,8 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 		Help:          "骰点(和r相同，但支持代骰):\n" + helpRollX,
 		AllowDelegate: true,
 		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-			// mctx := GetCtxProxyFirst(ctx, cmdArgs)
-			return cmdRoll.Solve(ctx, msg, cmdArgs)
+			mctx := GetCtxProxyFirst(ctx, cmdArgs)
+			return cmdRoll.Solve(mctx, msg, cmdArgs)
 		},
 	}
 
@@ -345,191 +348,544 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 		},
 	}
 
-	cmdBot := &types.CmdItemInfo{
-		Name:      "bot",
-		ShortHelp: ".bot on/off/about/bye/quit // 开启、关闭、查看信息、退群",
-		Help:      "骰子管理:\n.bot on/off/about/bye[exit,quit] // 开启、关闭、查看信息、退群",
-		Raw:       true,
-		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-			inGroup := msg.MessageType == "group"
-
-			ReplyToSender(ctx, msg, "测试用小海豹 v0.1\n海豹核心的精简实现，目前仅有基本骰点和部分coc7指令。\n缺少绝大部分指令，没有数据持久化功能，随时可能关闭，切勿用于跑团")
-			return types.CmdExecuteResult{Matched: true, Solved: true}
-
-			if inGroup {
-				// 不响应裸指令选项
-				// if len(cmdArgs.At) < 1 && ctx.Dice.Config.IgnoreUnaddressedBotCmd {
-				// 	return types.CmdExecuteResult{Matched: true, Solved: false}
-				// }
-				// 不响应at其他人
-				if cmdArgs.SomeoneBeMentionedButNotMe {
-					return types.CmdExecuteResult{Matched: true, Solved: false}
-				}
+	collectIDs := func(ctx *types.MsgContext, cmdArgs *types.CmdArgs, includeArgs bool) []string {
+		seen := map[string]struct{}{}
+		add := func(id string) {
+			id = strings.TrimSpace(id)
+			if id == "" {
+				return
 			}
-
-			if len(cmdArgs.Args) > 0 && !cmdArgs.IsArgEqual(1, "about") { //nolint:nestif
-				if cmdArgs.SomeoneBeMentionedButNotMe {
-					return types.CmdExecuteResult{Matched: true, Solved: false}
+			seen[id] = struct{}{}
+		}
+		for _, at := range cmdArgs.At {
+			add(at.UserID)
+		}
+		if includeArgs {
+			for _, raw := range cmdArgs.Args[1:] {
+				raw = strings.TrimSpace(raw)
+				if raw == "" {
+					continue
 				}
-
-				cmdArgs.ChopPrefixToArgsWith("on", "off")
-
-				matchNumber := func() (bool, bool) {
-					txt := cmdArgs.GetArgN(2)
-					if len(txt) >= 4 {
-						// if strings.HasSuffix(ctx.EndPoint.UserID, txt) {
-						// 	return true, txt != ""
-						// }
-					}
-					return false, txt != ""
+				if strings.EqualFold(raw, "me") {
+					add(ctx.Player.UserId)
+					continue
 				}
+				add(raw)
+			}
+		}
+		ids := make([]string, 0, len(seen))
+		for id := range seen {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		return ids
+	}
 
-				isMe, exists := matchNumber()
-				if exists && !isMe {
-					return types.CmdExecuteResult{Matched: true, Solved: false}
-				}
+	getActiveExts := func(ctx *types.MsgContext) []*types.ExtInfo {
+		if ctx.Group != nil {
+			return ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+		}
+		return ctx.Dice.GetExtList()
+	}
 
-				if cmdArgs.IsArgEqual(1, "on") {
-					// if msg.Platform != "QQ-CH" && !ctx.Dice.Config.BotExtFreeSwitch && ctx.PrivilegeLevel < 40 {
-					// 	ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master/管理/邀请者"))
-					// 	return types.CmdExecuteResult{Matched: true, Solved: true}
-					// }
-
-					if ctx.IsPrivate {
-						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
-						return types.CmdExecuteResult{Matched: true, Solved: true}
-					}
-
-					// SetBotOnAtGroup(ctx, msg.GroupID)
-					// TODO：ServiceAtNew此处忽略是否合理？
-					// ctx.Group, _ = ctx.Session.ServiceAtNew.Load(msg.GroupID)
-					ctx.IsCurGroupBotOn = true
-
-					text := DiceFormatTmpl(ctx, "核心:骰子开启")
-					if ctx.Group.LogOn {
-						text += "\n请特别注意: 日志记录处于开启状态"
-					}
-					ReplyToSender(ctx, msg, text)
-
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				} else if cmdArgs.IsArgEqual(1, "off") {
-					// if msg.Platform != "QQ-CH" && !ctx.Dice.Config.BotExtFreeSwitch && ctx.PrivilegeLevel < 40 {
-					// 	ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master/管理/邀请者"))
-					// 	return types.CmdExecuteResult{Matched: true, Solved: true}
-					// }
-
-					if ctx.IsPrivate {
-						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
-						return types.CmdExecuteResult{Matched: true, Solved: true}
-					}
-
-					// SetBotOffAtGroup(ctx, ctx.Group.GroupID)
-					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子关闭"))
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				} else if cmdArgs.IsArgEqual(1, "bye", "exit", "quit") {
-					if cmdArgs.GetArgN(2) != "" {
-						return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-					}
-
-					if ctx.IsPrivate {
-						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
-						return types.CmdExecuteResult{Matched: true, Solved: true}
-					}
-
-					// if ctx.PrivilegeLevel < 40 {
-					// 	ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_无权限_非master/管理"))
-					// 	return types.CmdExecuteResult{Matched: true, Solved: true}
-					// }
-
-					if !cmdArgs.AmIBeMentioned {
-						// 裸指令，如果当前群内开启，予以提示
-						if ctx.IsCurGroupBotOn {
-							ReplyToSender(ctx, msg, "[退群指令] 请@我使用这个命令，以进行确认")
-						}
-						return types.CmdExecuteResult{Matched: true, Solved: true}
-					}
-
-					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子退群预告"))
-
-					// userName := ctx.Dice.Parent.TryGetUserName(msg.Sender.UserID)
-					// txt := fmt.Sprintf("指令退群: 于群组<%s>(%s)中告别，操作者:<%s>(%s)",
-					// 	ctx.Group.GroupName, msg.GroupID, userName, msg.Sender.UserID)
-					// d.Logger.Info(txt)
-					// ctx.Notice(txt)
-
-					// SetBotOffAtGroup(ctx, ctx.Group.GroupID)
-					// time.Sleep(3 * time.Second)
-					// ctx.Group.DiceIDExistsMap.Delete(ctx.EndPoint.UserID)
-					// ctx.Group.UpdatedAtTime = time.Now().Unix()
-					// ctx.EndPoint.Adapter.QuitGroup(ctx, msg.GroupID)
-
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				} else if cmdArgs.IsArgEqual(1, "save") {
-					// d.Save(false)
-
-					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子保存设置"))
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-
+	cmdHelp := &types.CmdItemInfo{
+		Name:      "help",
+		ShortHelp: ".help [指令] // 查看帮助",
+		Help:      "帮助:\n.help [指令] // 查看指定指令帮助\n.help // 查看当前可用指令",
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
 				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
 			}
-
-			if cmdArgs.SomeoneBeMentionedButNotMe {
-				return types.CmdExecuteResult{Matched: false, Solved: false}
+			target := strings.ToLower(cmdArgs.GetArgN(1))
+			activeExts := getActiveExts(ctx)
+			lookup := map[string]*types.CmdItemInfo{}
+			for _, ext := range activeExts {
+				for name, info := range ext.CmdMap {
+					if info == nil {
+						continue
+					}
+					canonical := info.Name
+					if canonical == "" {
+						canonical = name
+					}
+					for _, key := range []string{name, canonical} {
+						key = strings.ToLower(key)
+						if key == "" {
+							continue
+						}
+						if _, exists := lookup[key]; !exists {
+							lookup[key] = info
+						}
+					}
+				}
+			}
+			if target != "" {
+				if info, ok := lookup[target]; ok {
+					text := info.Help
+					if text == "" {
+						text = info.ShortHelp
+					}
+					if text == "" {
+						text = fmt.Sprintf("指令 %s 暂无帮助信息", target)
+					}
+					ReplyToSender(ctx, msg, text)
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				ReplyToSender(ctx, msg, fmt.Sprintf("未找到指令: %s", target))
+				return types.CmdExecuteResult{Matched: true, Solved: true}
 			}
 
-			activeCount := 0
-			serveCount := 0
-			// Pinenutn: Range模板 ServiceAtNew重构代码
-			// d.ImSession.ServiceAtNew.Range(func(_ string, gp *GroupInfo) bool {
-			// 	// Pinenutn: ServiceAtNew重构
-			// 	if gp.GroupID != "" &&
-			// 		!strings.HasPrefix(gp.GroupID, "PG-") &&
-			// 		gp.DiceIDExistsMap.Exists(ctx.EndPoint.UserID) {
-			// 		serveCount++
-			// 		if gp.DiceIDActiveMap.Exists(ctx.EndPoint.UserID) {
-			// 			activeCount++
-			// 		}
-			// 	}
-			// 	return true
-			// })
-
-			// onlineVer := ""
-			// if d.Parent.AppVersionOnline != nil {
-			// 	ver := d.Parent.AppVersionOnline
-			// 	// 如果当前不是最新版，那么提示
-			// 	if ver.VersionLatestCode != VERSION_CODE {
-			// 		onlineVer = "\n最新版本: " + ver.VersionLatestDetail + "\n"
-			// 	}
-			// }
-
-			// var groupWorkInfo, activeText string
-			// if inGroup {
-			// 	activeText = "关闭"
-			// 	if ctx.Group.IsActive(ctx) {
-			// 		activeText = "开启"
-			// 	}
-			// 	groupWorkInfo = "\n群内工作状态: " + activeText
-			// }
-
-			VarSetValueInt64(ctx, "$t供职群数", int64(serveCount))
-			VarSetValueInt64(ctx, "$t启用群数", int64(activeCount))
-			// VarSetValueStr(ctx, "$t群内工作状态", groupWorkInfo)
-			// VarSetValueStr(ctx, "$t群内工作状态_仅状态", activeText)
-			// ver := VERSION.String()
-			// arch := runtime.GOARCH
-			// if arch != "386" && arch != "amd64" {
-			// 	ver = fmt.Sprintf("%s %s", ver, arch)
-			// }
-			// baseText := fmt.Sprintf("SealDice %s%s", ver, onlineVer)
-			extText := DiceFormatTmpl(ctx, "核心:骰子状态附加文本")
-			if extText != "" {
-				extText = "\n" + extText
+			var builder strings.Builder
+			builder.WriteString("可用指令列表:\n")
+			for _, ext := range activeExts {
+				entries := map[string]string{}
+				for name, info := range ext.CmdMap {
+					if info == nil {
+						continue
+					}
+					canonical := info.Name
+					if canonical == "" {
+						canonical = name
+					}
+					key := strings.ToLower(canonical)
+					if _, exists := entries[key]; exists {
+						continue
+					}
+					short := info.ShortHelp
+					if short == "" {
+						short = "." + canonical
+					}
+					entries[key] = short
+				}
+				if len(entries) == 0 {
+					continue
+				}
+				builder.WriteString(fmt.Sprintf("[%s]\n", ext.Name))
+				keys := make([]string, 0, len(entries))
+				for key := range entries {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+				for _, key := range keys {
+					entry := entries[key]
+					builder.WriteString(entry)
+					if !strings.HasSuffix(entry, "\n") {
+						builder.WriteString("\n")
+					}
+				}
 			}
-			// text := baseText + extText
+			ReplyToSender(ctx, msg, builder.String())
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
 
-			// ReplyToSender(ctx, msg, text)
+	cmdBot := &types.CmdItemInfo{
+		Name:      "bot",
+		ShortHelp: ".bot on/off/about/bye // 管理骰子状态",
+		Help:      "骰子管理:\n.bot on // 开启当前群服务\n.bot off // 关闭当前群服务\n.bot about // 查看骰子信息\n.bot bye // 退群前提示",
+		Raw:       true,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			action := strings.ToLower(cmdArgs.GetArgN(1))
+			if action == "" {
+				action = "about"
+			}
+			switch action {
+			case "on":
+				if ctx.IsPrivate || ctx.Group == nil {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				ctx.Group.Active = true
+				ctx.IsCurGroupBotOn = true
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子开启"))
+			case "off":
+				if ctx.IsPrivate || ctx.Group == nil {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				ctx.Group.Active = false
+				ctx.IsCurGroupBotOn = false
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子关闭"))
+			case "bye", "quit", "exit":
+				if ctx.IsPrivate || ctx.Group == nil {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子退群预告"))
+			case "about":
+				info := "测试用小海豹 v0.1\n海豹核心的精简实现，目前仅有基本骰点和部分coc7指令。\n缺少绝大部分指令，没有数据持久化功能，随时可能关闭，切勿用于跑团"
+				ReplyToSender(ctx, msg, info)
+			default:
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
 
+	cmdDismiss := &types.CmdItemInfo{
+		Name:              "dismiss",
+		ShortHelp:         ".dismiss // 退群别名",
+		Help:              "退群(映射到 .bot bye):\n.dismiss",
+		Raw:               true,
+		DisabledInPrivate: true,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if ctx.IsPrivate {
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+			cloned := *cmdArgs
+			cloned.Args = append([]string{"bye"}, cmdArgs.Args...)
+			if cmdArgs.CleanArgs != "" {
+				cloned.CleanArgs = strings.TrimSpace("bye " + cmdArgs.CleanArgs)
+			} else {
+				cloned.CleanArgs = "bye"
+			}
+			cloned.RawArgs = cloned.CleanArgs
+			return cmdBot.Solve(ctx, msg, &cloned)
+		},
+	}
+
+	botListHelp := ".botlist add @A ... // 标记其他机器人\n.botlist del @A ... // 移除标记\n.botlist list // 查看当前列表"
+	cmdBotList := &types.CmdItemInfo{
+		Name:      "botlist",
+		ShortHelp: botListHelp,
+		Help:      "机器人列表:\n" + botListHelp,
+		Raw:       true,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if ctx.IsPrivate || ctx.Group == nil {
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:提示_私聊不可用"))
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+			action := strings.ToLower(cmdArgs.GetArgN(1))
+			if action == "" {
+				action = "list"
+			}
+			ctx.Group.EnsureBotList()
+			switch action {
+			case "add":
+				ids := collectIDs(ctx, cmdArgs, true)
+				if len(ids) == 0 {
+					ReplyToSender(ctx, msg, "请通过@或参数指定要标记的账号")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				for _, id := range ids {
+					ctx.Group.BotList.Store(id, true)
+				}
+				ReplyToSender(ctx, msg, fmt.Sprintf("已标记 %d 个账号为机器人", len(ids)))
+			case "del", "rm":
+				ids := collectIDs(ctx, cmdArgs, true)
+				if len(ids) == 0 {
+					ReplyToSender(ctx, msg, "请通过@或参数指定要移除的账号")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				removed := 0
+				for _, id := range ids {
+					if ctx.Group.BotList.Delete(id) {
+						removed++
+					}
+				}
+				ReplyToSender(ctx, msg, fmt.Sprintf("已移除 %d 个机器人标记", removed))
+			case "list", "show":
+				bots := []string{}
+				ctx.Group.BotList.Range(func(id string, _ bool) bool {
+					bots = append(bots, id)
+					return true
+				})
+				if len(bots) == 0 {
+					ReplyToSender(ctx, msg, "当前未配置其他机器人")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				sort.Strings(bots)
+				ReplyToSender(ctx, msg, "群内其他机器人列表:\n- "+strings.Join(bots, "\n- "))
+			default:
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	masterHelp := ".master add @A // 添加骰主\n.master del @A // 移除骰主\n.master list // 查看骰主列表"
+	cmdMaster := &types.CmdItemInfo{
+		Name:          "master",
+		ShortHelp:     masterHelp,
+		Help:          "骰主指令(精简版):\n" + masterHelp,
+		AllowDelegate: true,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			action := strings.ToLower(cmdArgs.GetArgN(1))
+			switch action {
+			case "help":
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			case "add":
+				ids := collectIDs(ctx, cmdArgs, true)
+				if len(ids) == 0 {
+					ReplyToSender(ctx, msg, "请通过@或参数指定要添加的账号")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				for _, id := range ids {
+					ctx.Dice.MasterAdd(id)
+				}
+				ReplyToSender(ctx, msg, fmt.Sprintf("已添加 %d 位master", len(ids)))
+			case "del", "rm":
+				ids := collectIDs(ctx, cmdArgs, true)
+				if len(ids) == 0 {
+					ReplyToSender(ctx, msg, "请通过@或参数指定要移除的账号")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				removed := 0
+				for _, id := range ids {
+					if ctx.Dice.MasterRemove(id) {
+						removed++
+					}
+				}
+				ReplyToSender(ctx, msg, fmt.Sprintf("已移除 %d 位master", removed))
+			case "list", "":
+				masters := ctx.Dice.ListMasters()
+				if len(masters) == 0 {
+					ReplyToSender(ctx, msg, "尚未配置master")
+				} else {
+					ReplyToSender(ctx, msg, "当前master列表:\n- "+strings.Join(masters, "\n- "))
+				}
+			default:
+				ReplyToSender(ctx, msg, "当前实现仅支持 add/del/list 指令")
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	helpNN := ".nn // 查看当前角色名\n.nn <角色名> // 设置角色名\n.nn clr // 重置为平台昵称"
+	cmdNN := &types.CmdItemInfo{
+		Name:      "nn",
+		ShortHelp: helpNN,
+		Help:      "角色名设置:\n" + helpNN,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			val := strings.ToLower(cmdArgs.GetArgN(1))
+			switch val {
+			case "":
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:昵称_当前"))
+			case "help":
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			case "clr", "reset":
+				newName := msg.Sender.Nickname
+				VarSetValueStr(ctx, "旧昵称", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "旧昵称_RAW", ctx.Player.Name)
+				ctx.Player.Name = newName
+				ctx.Player.UpdatedAtTime = time.Now().Unix()
+				VarSetValueStr(ctx, "玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "玩家_RAW", ctx.Player.Name)
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:昵称_重置"))
+			default:
+				clean := strings.TrimSpace(cmdArgs.CleanArgs)
+				if clean == "" {
+					clean = cmdArgs.GetArgN(1)
+				}
+				VarSetValueStr(ctx, "旧昵称", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "旧昵称_RAW", ctx.Player.Name)
+				ctx.Player.Name = clean
+				ctx.Player.UpdatedAtTime = time.Now().Unix()
+				VarSetValueStr(ctx, "玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "玩家_RAW", ctx.Player.Name)
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:昵称_改名"))
+			}
+			if ctx.Group != nil {
+				ctx.Group.Players.Store(ctx.Player.UserId, ctx.Player)
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	cmdUserID := &types.CmdItemInfo{
+		Name:      "userid",
+		ShortHelp: ".userid // 查看当前帐号和群组ID",
+		Help:      "查看ID:\n.userid // 查看当前帐号和群组ID",
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			text := fmt.Sprintf("个人账号ID为 %s", ctx.Player.UserId)
+			if ctx.Group != nil && !ctx.IsPrivate {
+				text += fmt.Sprintf("\n当前群组ID为 %s", ctx.Group.GroupId)
+			}
+			ReplyToSender(ctx, msg, text)
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	helpSet := ".set info // 查看当前面数\n.set <面数或表达式> // 设置群默认骰子面数\n.set dnd // 切换到DND模式\n.set coc // 切换到COC模式\n.set clr // 清除群内面数设置"
+	cmdSet := &types.CmdItemInfo{
+		Name:      "set",
+		ShortHelp: helpSet,
+		Help:      "设定骰子面数:\n" + helpSet,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			if ctx.Group == nil {
+				ReplyToSender(ctx, msg, "仅群聊中可设置默认面数")
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+			sub := strings.ToLower(cmdArgs.GetArgN(1))
+			switch sub {
+			case "", "info":
+				expr := ctx.Group.DiceSideExpr
+				if expr == "" {
+					expr = ctx.GetDefaultDicePoints()
+				}
+				text := fmt.Sprintf("当前群默认骰子面数: %s", strings.ToUpper(expr))
+				if ctx.Group.System != "" {
+					text += fmt.Sprintf("\n当前规则模板: %s", ctx.Group.System)
+				}
+				ReplyToSender(ctx, msg, text)
+			case "clr":
+				ctx.Group.DiceSideExpr = ""
+				ctx.Group.System = ""
+				ctx.Group.UpdatedAtTime = time.Now().Unix()
+				ReplyToSender(ctx, msg, "已清除群默认骰子面数设置")
+			case "dnd", "dnd5e":
+				ctx.Group.DiceSideExpr = "d20"
+				ctx.Group.System = "dnd5e"
+				ctx.Group.UpdatedAtTime = time.Now().Unix()
+				ctx.GameSystem, _ = ctx.Dice.GameSystemMapLoad("dnd5e")
+				if ext := ctx.Dice.ExtFind("dnd5e", false); ext != nil {
+					ctx.Group.ExtActive(ext)
+				}
+				ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+				ReplyToSender(ctx, msg, "已切换至 DND 模式，默认骰子面数 d20")
+			case "coc", "coc7":
+				ctx.Group.DiceSideExpr = "d100"
+				ctx.Group.System = "coc7"
+				ctx.Group.UpdatedAtTime = time.Now().Unix()
+				ctx.GameSystem, _ = ctx.Dice.GameSystemMapLoad("coc7")
+				if ext := ctx.Dice.ExtFind("coc7", false); ext != nil {
+					ctx.Group.ExtActive(ext)
+				}
+				ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+				ReplyToSender(ctx, msg, "已切换至 COC 模式，默认骰子面数 d100")
+			default:
+				expr := strings.ToLower(cmdArgs.GetArgN(1))
+				if expr == "" {
+					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
+				if _, err := strconv.Atoi(expr); err == nil {
+					expr = "d" + expr
+				}
+				ctx.Group.DiceSideExpr = expr
+				ctx.Group.UpdatedAtTime = time.Now().Unix()
+				ReplyToSender(ctx, msg, fmt.Sprintf("已将群默认骰子面数设置为 %s", strings.ToUpper(expr)))
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	helpExt := ".ext list // 查看所有扩展状态\n.ext on <扩展名> // 开启指定扩展\n.ext off <扩展名> // 关闭指定扩展"
+	cmdExt := &types.CmdItemInfo{
+		Name:      "ext",
+		ShortHelp: helpExt,
+		Help:      "扩展管理:\n" + helpExt,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			if ctx.Group == nil {
+				ReplyToSender(ctx, msg, "扩展管理指令仅在群聊中可用")
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+			action := strings.ToLower(cmdArgs.GetArgN(1))
+			if action == "" {
+				action = "list"
+			}
+			switch action {
+			case "list":
+				var result strings.Builder
+				result.WriteString("当前扩展状态:\n")
+				for _, ext := range ctx.Dice.GetExtList() {
+					status := "❌ 关闭"
+					if ctx.Group.IsExtensionActive(ext.Name) {
+						status = "✅ 开启"
+					}
+					result.WriteString(fmt.Sprintf("%s: %s\n", ext.Name, status))
+				}
+				ReplyToSender(ctx, msg, result.String())
+			case "on":
+				if len(cmdArgs.Args) < 2 {
+					ReplyToSender(ctx, msg, "请指定要开启的扩展名")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				var opened []string
+				var missing []string
+				for _, raw := range cmdArgs.Args[1:] {
+					ext := ctx.Dice.ExtFind(raw, false)
+					if ext == nil {
+						missing = append(missing, raw)
+						continue
+					}
+					ctx.Group.ExtActive(ext)
+					opened = append(opened, ext.Name)
+				}
+				ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+				parts := []string{}
+				if len(opened) > 0 {
+					parts = append(parts, fmt.Sprintf("已开启扩展: %s", strings.Join(opened, ", ")))
+				}
+				if len(missing) > 0 {
+					parts = append(parts, fmt.Sprintf("未找到: %s", strings.Join(missing, ", ")))
+				}
+				ReplyToSender(ctx, msg, strings.Join(parts, "\n"))
+			case "off":
+				if len(cmdArgs.Args) < 2 {
+					ReplyToSender(ctx, msg, "请指定要关闭的扩展名")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+				var closed []string
+				var failed []string
+				for _, raw := range cmdArgs.Args[1:] {
+					if strings.EqualFold(raw, "core") {
+						failed = append(failed, raw)
+						continue
+					}
+					removed := ctx.Group.ExtInactiveByName(raw)
+					if removed == nil {
+						ext := ctx.Dice.ExtFind(raw, false)
+						if ext == nil || strings.EqualFold(ext.Name, "core") {
+							failed = append(failed, raw)
+							continue
+						}
+						removed = ctx.Group.ExtInactiveByName(ext.Name)
+					}
+					if removed != nil {
+						closed = append(closed, removed.Name)
+					} else {
+						failed = append(failed, raw)
+					}
+				}
+				ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+				parts := []string{}
+				if len(closed) > 0 {
+					parts = append(parts, fmt.Sprintf("已关闭扩展: %s", strings.Join(closed, ", ")))
+				}
+				if len(failed) > 0 {
+					parts = append(parts, fmt.Sprintf("未找到或不可关闭: %s", strings.Join(failed, ", ")))
+				}
+				ReplyToSender(ctx, msg, strings.Join(parts, "\n"))
+			default:
+				ext := ctx.Dice.ExtFind(action, false)
+				if ext == nil {
+					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
+				desc := ""
+				if ext.GetDescText != nil {
+					desc = ext.GetDescText(ext)
+				} else if ext.Brief != "" {
+					desc = ext.Brief
+				}
+				info := fmt.Sprintf("> [%s] 版本%s 作者%s", ext.Name, ext.Version, ext.Author)
+				if desc != "" {
+					info += "\n" + desc
+				}
+				ReplyToSender(ctx, msg, info)
+			}
 			return types.CmdExecuteResult{Matched: true, Solved: true}
 		},
 	}
@@ -544,110 +900,15 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 	cmdMap["rxh"] = cmdRollX
 	cmdMap["rhx"] = cmdRollX
 
-	helpExt := ".ext list // 查看所有扩展状态\n.ext on <扩展名> // 开启指定扩展\n.ext off <扩展名> // 关闭指定扩展"
-	cmdExt := &types.CmdItemInfo{
-		Name:      "ext",
-		ShortHelp: helpExt,
-		Help:      "扩展管理:\n" + helpExt,
-		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-			if cmdArgs.IsArgEqual(1, "help") {
-				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-			}
-
-			if msg.MessageType != "group" {
-				ReplyToSender(ctx, msg, "扩展管理指令仅在群聊中可用")
-				return types.CmdExecuteResult{Matched: true, Solved: true}
-			}
-
-			switch cmdArgs.GetArgN(1) {
-			case "list":
-				var result strings.Builder
-				result.WriteString("当前扩展状态:\n")
-				for _, ext := range ctx.Dice.GetExtList() {
-					status := "❌ 关闭"
-					if ctx.Group.IsExtensionActive(ext.Name) {
-						status = "✅ 开启"
-					}
-					result.WriteString(fmt.Sprintf("%s: %s\n", ext.Name, status))
-				}
-				ReplyToSender(ctx, msg, result.String())
-
-			case "on":
-				extName := cmdArgs.GetArgN(2)
-				if extName == "" {
-					ReplyToSender(ctx, msg, "请指定要开启的扩展名")
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				// 查找扩展是否存在
-				var targetExt *types.ExtInfo
-				for _, ext := range ctx.Dice.GetExtList() {
-					if ext.Name == extName {
-						targetExt = ext
-						break
-					}
-				}
-
-				if targetExt == nil {
-					ReplyToSender(ctx, msg, fmt.Sprintf("未找到扩展: %s", extName))
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				if ctx.Group.IsExtensionActive(extName) {
-					ReplyToSender(ctx, msg, fmt.Sprintf("扩展 %s 已经是开启状态", extName))
-				} else {
-					ctx.Group.SetExtensionActive(extName, true)
-					// 更新ActivatedExtList
-					ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
-					ReplyToSender(ctx, msg, fmt.Sprintf("已开启扩展: %s", extName))
-				}
-
-			case "off":
-				extName := cmdArgs.GetArgN(2)
-				if extName == "" {
-					ReplyToSender(ctx, msg, "请指定要关闭的扩展名")
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				// 不允许关闭core扩展
-				if extName == "core" {
-					ReplyToSender(ctx, msg, "核心扩展不能被关闭")
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				// 查找扩展是否存在
-				var targetExt *types.ExtInfo
-				for _, ext := range ctx.Dice.GetExtList() {
-					if ext.Name == extName {
-						targetExt = ext
-						break
-					}
-				}
-
-				if targetExt == nil {
-					ReplyToSender(ctx, msg, fmt.Sprintf("未找到扩展: %s", extName))
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-
-				if !ctx.Group.IsExtensionActive(extName) {
-					ReplyToSender(ctx, msg, fmt.Sprintf("扩展 %s 已经是关闭状态", extName))
-				} else {
-					ctx.Group.SetExtensionActive(extName, false)
-					// 更新ActivatedExtList
-					ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
-					ReplyToSender(ctx, msg, fmt.Sprintf("已关闭扩展: %s", extName))
-				}
-
-			default:
-				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-			}
-
-			return types.CmdExecuteResult{Matched: true, Solved: true}
-		},
-	}
-
 	cmdMap["text"] = cmdText
+	cmdMap["help"] = cmdHelp
 	cmdMap["bot"] = cmdBot
+	cmdMap["dismiss"] = cmdDismiss
+	cmdMap["botlist"] = cmdBotList
+	cmdMap["master"] = cmdMaster
+	cmdMap["nn"] = cmdNN
+	cmdMap["userid"] = cmdUserID
+	cmdMap["set"] = cmdSet
 	cmdMap["ext"] = cmdExt
 
 	theExt.CmdMap = cmdMap
