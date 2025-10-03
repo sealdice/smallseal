@@ -4,26 +4,12 @@ import "encoding/json"
 
 type MessageSegments []IMessageElement
 
-func (ms MessageSegments) ToText() string {
-	// TOOD: 将特殊元素以助记符的形式转为文本，例如说 #1 #2 之类(实际复杂一点)，以实现文本和segment的互转。指令处理不用文本还是挺麻烦的
-	var text string
-	for _, elem := range ms {
-		// 类型断言
-		if e, ok := elem.(*TextElement); ok {
-			text += e.Content
-		}
-	}
-	return text
-}
-
 // MarshalJSON 实现 MessageSegments 的 JSON 序列化
 func (ms MessageSegments) MarshalJSON() ([]byte, error) {
 	var segments []map[string]any
-
 	for _, elem := range ms {
 		segment := make(map[string]any)
 		segment["type"] = elem.Type()
-
 		switch e := elem.(type) {
 		case *TextElement:
 			segment["data"] = map[string]any{
@@ -39,7 +25,6 @@ func (ms MessageSegments) MarshalJSON() ([]byte, error) {
 			for _, nestedElem := range e.Elements {
 				nestedSegment := make(map[string]any)
 				nestedSegment["type"] = nestedElem.Type()
-
 				switch ne := nestedElem.(type) {
 				case *TextElement:
 					nestedSegment["data"] = map[string]any{
@@ -55,7 +40,6 @@ func (ms MessageSegments) MarshalJSON() ([]byte, error) {
 				}
 				elementsData = append(elementsData, nestedSegment)
 			}
-
 			segment["data"] = map[string]any{
 				"replySeq": e.ReplySeq,
 				"sender":   e.Sender,
@@ -92,10 +76,8 @@ func (ms MessageSegments) MarshalJSON() ([]byte, error) {
 			// 未知类型，使用空数据
 			segment["data"] = map[string]any{}
 		}
-
 		segments = append(segments, segment)
 	}
-
 	return json.Marshal(segments)
 }
 
@@ -105,15 +87,12 @@ func (ms *MessageSegments) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &segments); err != nil {
 		return err
 	}
-
 	*ms = make(MessageSegments, 0, len(segments))
-
 	for _, segment := range segments {
 		typeVal, ok := segment["type"]
 		if !ok {
 			continue
 		}
-
 		// 类型可能是数字或字符串
 		var elemType ElementType
 		switch t := typeVal.(type) {
@@ -148,19 +127,15 @@ func (ms *MessageSegments) UnmarshalJSON(data []byte) error {
 		default:
 			continue // 跳过无效类型
 		}
-
 		dataVal, ok := segment["data"]
 		if !ok {
 			continue
 		}
-
 		dataMap, ok := dataVal.(map[string]any)
 		if !ok {
 			continue
 		}
-
 		var elem IMessageElement
-
 		switch elemType {
 		case Text:
 			if content, ok := dataMap["content"].(string); ok {
@@ -181,7 +156,6 @@ func (ms *MessageSegments) UnmarshalJSON(data []byte) error {
 			if groupID, ok := dataMap["groupID"].(string); ok {
 				replyElem.GroupID = groupID
 			}
-
 			// 处理嵌套的 elements
 			if elementsData, ok := dataMap["elements"].([]any); ok {
 				for _, elemData := range elementsData {
@@ -238,11 +212,9 @@ func (ms *MessageSegments) UnmarshalJSON(data []byte) error {
 		default:
 			continue // 跳过未知类型
 		}
-
 		if elem != nil {
 			*ms = append(*ms, elem)
 		}
 	}
-
 	return nil
 }
