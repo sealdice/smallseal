@@ -2,8 +2,11 @@ package attrs
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	ds "github.com/sealdice/dicescript"
@@ -29,9 +32,7 @@ func (am *AttrsManager) Stop() {
 func (am *AttrsManager) Load(groupId string, userId string) (*AttributesItem, error) {
 	userId = am.UIDConvert(userId)
 
-	if am.io == nil {
-		am.io = &MemoryAttrsIO{}
-	}
+	am.ensureIO()
 
 	// 组装当前群-用户的id
 	gid := fmt.Sprintf("%s-%s", groupId, userId)
@@ -58,15 +59,31 @@ func (am *AttrsManager) UIDConvert(userId string) string {
 
 func (am *AttrsManager) GetCharacterList(userId string) ([]*AttributesItem, error) {
 	userId = am.UIDConvert(userId)
+	am.ensureIO()
 	lst, err := am.io.ListByUid(userId)
 	if err != nil {
 		return nil, err
 	}
-	return lst, err
+	for _, item := range lst {
+		groups, err := am.io.BindingGroupIdList(item.ID)
+		if err != nil {
+			item.BindingGroupsNum = 0
+			continue
+		}
+		item.BindingGroupsNum = len(groups)
+	}
+	sort.Slice(lst, func(i, j int) bool {
+		if lst[i].LastUsedTime == lst[j].LastUsedTime {
+			return lst[i].Name < lst[j].Name
+		}
+		return lst[i].LastUsedTime > lst[j].LastUsedTime
+	})
+	return lst, nil
 }
 
 func (am *AttrsManager) CharNew(userId string, name string, sheetType string) (*AttributesItem, error) {
 	userId = am.UIDConvert(userId)
+	am.ensureIO()
 	dict := &ds.ValueMap{}
 	// dict.Store("$sheetType", ds.NewStrVal(sheetType))
 	json, err := ds.NewDictVal(dict).V().ToJSON()
@@ -74,16 +91,39 @@ func (am *AttrsManager) CharNew(userId string, name string, sheetType string) (*
 		return nil, err
 	}
 
-	return &AttributesItem{
-		Name:      name,
-		OwnerId:   userId,
-		AttrsType: "character",
-		SheetType: sheetType,
-		Data:      json,
-	}, nil
+	now := time.Now().Unix()
+	item := &AttributesItem{
+		ID:               generateAttrID(),
+		Name:             name,
+		OwnerId:          userId,
+		AttrsType:        "character",
+		SheetType:        sheetType,
+		Data:             json,
+		valueMap:         dict,
+		LastModifiedTime: now,
+		LastUsedTime:     now,
+		IsSaved:          true,
+	}
+	params := []*AttrsUpsertParams{
+		{
+			Id:        item.ID,
+			Data:      item.Data,
+			Name:      item.Name,
+			SheetType: item.SheetType,
+			OwnerId:   item.OwnerId,
+			AttrsType: item.AttrsType,
+			IsHidden:  item.IsHidden,
+		},
+	}
+	if err := am.io.Puts(params); err != nil {
+		return nil, err
+	}
+	am.m.Store(item.ID, item)
+	return item, nil
 }
 
 func (am *AttrsManager) CharDelete(id string) error {
+	am.ensureIO()
 	if err := am.io.DeleteById(id); err != nil {
 		return err
 	}
@@ -98,6 +138,7 @@ func (am *AttrsManager) CharDelete(id string) error {
 // 3. 群属性(id为群id)
 // 4. 用户全局属性
 func (am *AttrsManager) LoadById(id string) (*AttributesItem, error) {
+	am.ensureIO()
 	// 1. 如果当前有缓存，那么从缓存中返回。
 	// 但是。。如果有人把这个对象一直持有呢？
 	i, exists := am.m.Load(id)
@@ -120,12 +161,17 @@ func (am *AttrsManager) LoadById(id string) (*AttributesItem, error) {
 		}
 		if dd, ok := v.ReadDictData(); ok {
 			i = &AttributesItem{
-				ID:           id,
-				valueMap:     dd.Dict,
-				Name:         data.Name,
-				SheetType:    data.SheetType,
-				LastUsedTime: time.Now().Unix(),
-				IsSaved:      true,
+				ID:               id,
+				valueMap:         dd.Dict,
+				Name:             data.Name,
+				SheetType:        data.SheetType,
+				OwnerId:          data.OwnerId,
+				AttrsType:        data.AttrsType,
+				IsHidden:         data.IsHidden,
+				BindingGroupsNum: data.BindingGroupsNum,
+				LastModifiedTime: data.LastModifiedTime,
+				LastUsedTime:     time.Now().Unix(),
+				IsSaved:          true,
 			}
 			am.m.Store(id, i)
 			return i, nil
@@ -197,47 +243,104 @@ func (am *AttrsManager) CheckAndFreeUnused() error {
 
 func (am *AttrsManager) CharBind(charId string, groupId string, userId string) error {
 	userId = am.UIDConvert(userId)
-	// id := fmt.Sprintf("%s-%s", groupId, userId)
+	am.ensureIO()
+	if charId == "" {
+		return am.io.Unbind(groupId, userId)
+	}
 	return am.io.Bind(groupId, userId, charId)
 }
 
 // CharGetBindingId 获取当前群绑定的角色ID
 func (am *AttrsManager) CharGetBindingId(groupId string, userId string) (string, error) {
 	userId = am.UIDConvert(userId)
-	// id := fmt.Sprintf("%s-%s", groupId, userId) // TODO: 之前好像是用id拿的，待确认
+	am.ensureIO()
 	return am.io.BindingIdGet(groupId, userId)
 }
 
+func (am *AttrsManager) CharIdGetByName(userId string, name string) (string, error) {
+	userId = am.UIDConvert(userId)
+	am.ensureIO()
+	item, err := am.io.GetByUidAndName(userId, name)
+	if err != nil {
+		return "", err
+	}
+	if item == nil {
+		return "", nil
+	}
+	return item.ID, nil
+}
+
 func (am *AttrsManager) CharCheckExists(userId string, name string) bool {
-	id, err := am.io.GetByUidAndName(userId, name)
+	am.ensureIO()
+	id, err := am.CharIdGetByName(userId, name)
 	if err != nil {
 		return false
 	}
-	return id != nil
+	return id != ""
 }
 
 func (am *AttrsManager) CharGetBindingGroupIdList(id string) []string {
+	am.ensureIO()
 	all, err := am.io.BindingGroupIdList(id)
 	if err != nil {
 		return []string{}
-	}
-	// 只要群号
-	for i, v := range all {
-		a, b, _ := utils.UnpackGroupUserId(v)
-		if b != "" {
-			all[i] = a
-		} else {
-			all[i] = b
-		}
 	}
 	return all
 }
 
 func (am *AttrsManager) CharUnbindAll(id string) []string {
+	am.ensureIO()
 	all := am.CharGetBindingGroupIdList(id)
 	_, err := am.io.UnbindAll(id)
 	if err != nil {
 		return []string{}
 	}
 	return all
+}
+
+func (am *AttrsManager) Save(item *AttributesItem) error {
+	am.ensureIO()
+	if item == nil {
+		return errors.New("attributes item is nil")
+	}
+	if item.valueMap == nil {
+		item.valueMap = &ds.ValueMap{}
+	}
+	jsonData, err := ds.NewDictVal(item.valueMap).V().ToJSON()
+	if err != nil {
+		return err
+	}
+	item.Data = jsonData
+	item.LastModifiedTime = time.Now().Unix()
+	params := []*AttrsUpsertParams{
+		{
+			Id:        item.ID,
+			Data:      item.Data,
+			Name:      item.Name,
+			SheetType: item.SheetType,
+			OwnerId:   item.OwnerId,
+			AttrsType: item.AttrsType,
+			IsHidden:  item.IsHidden,
+		},
+	}
+	if err := am.io.Puts(params); err != nil {
+		return err
+	}
+	item.IsSaved = true
+	am.m.Store(item.ID, item)
+	return nil
+}
+
+func (am *AttrsManager) ensureIO() {
+	if am.io == nil {
+		am.io = NewMemoryAttrsIO()
+	}
+}
+
+func generateAttrID() string {
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err == nil {
+		return "char-" + hex.EncodeToString(buf)
+	}
+	return fmt.Sprintf("char-%d", time.Now().UnixNano())
 }

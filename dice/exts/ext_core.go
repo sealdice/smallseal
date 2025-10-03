@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/sealdice/smallseal/dice/types"
 
 	ds "github.com/sealdice/dicescript"
@@ -779,6 +780,318 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 		},
 	}
 
+	helpCh := ".pc new <角色名> // 新建角色并绑卡\n" +
+		".pc tag [<角色名> | <角色序号>] // 当前群绑卡/解除绑卡(不填角色名)\n" +
+		".pc untagAll [<角色名> | <角色序号>] // 全部群解绑(不填即当前卡)\n" +
+		".pc list // 列出当前角色和序号\n" +
+		".pc rename <新角色名> // 将当前绑定角色改名\n" +
+		".pc rename <角色名|序号> <新角色名> // 将指定角色改名 \n" +
+		".pc save [<角色名>] // [不绑卡]保存角色，角色名可省略\n" +
+		".pc load (<角色名> | <角色序号>) // [不绑卡]加载角色\n" +
+		".pc del/rm (<角色名> | <角色序号>) // 删除角色 角色序号可用pc list查询\n" +
+		"> 注: 海豹各群数据独立(多张空白卡)，单群游戏不需要存角色。"
+
+	cmdChar := &types.CmdItemInfo{
+		Name:      "pc",
+		ShortHelp: helpCh,
+		Help:      "角色管理:\n" + helpCh,
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) (result types.CmdExecuteResult) {
+			if ctx.AttrsManager == nil {
+				ReplyToSender(ctx, msg, "角色系统尚未初始化")
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+
+			cmdArgs.ChopPrefixToArgsWith("list", "lst", "load", "save", "del", "rm", "new", "tag", "untagAll", "rename")
+			val1 := strings.ToLower(cmdArgs.GetArgN(1))
+			am := ctx.AttrsManager
+
+			defer func() {
+				if rec := recover(); rec != nil {
+					if err, ok := rec.(error); ok {
+						ReplyToSender(ctx, msg, fmt.Sprintf("错误: %s\n", err.Error()))
+						result = types.CmdExecuteResult{Matched: true, Solved: true}
+					} else {
+						panic(rec)
+					}
+				}
+			}()
+
+			getNicknameRaw := func(usePlayerName bool, tryIndex bool) string {
+				name := cmdArgs.CleanArgsChopRest
+
+				if tryIndex {
+					if idx, err := strconv.ParseInt(name, 10, 64); err == nil && idx > 0 {
+						items := lo.Must(am.GetCharacterList(ctx.Player.UserId))
+						if idx <= int64(len(items)) {
+							return items[idx-1].Name
+						}
+					}
+				}
+
+				if usePlayerName && name == "" {
+					name = ctx.Player.Name
+				}
+				name = strings.ReplaceAll(name, "\n", "")
+				name = strings.ReplaceAll(name, "\r", "")
+				if len(name) > 90 {
+					name = name[:90]
+				}
+				return name
+			}
+
+			getNickname := func() string {
+				return getNicknameRaw(true, true)
+			}
+
+			getBindingId := func() string {
+				id, _ := am.CharGetBindingId(ctx.Group.GroupId, ctx.Player.UserId)
+				return id
+			}
+
+			setCurPlayerName := func(name string) {
+				ctx.Player.Name = name
+				ctx.Player.UpdatedAtTime = time.Now().Unix()
+				if ctx.Group != nil {
+					ctx.Group.Players.Store(ctx.Player.UserId, ctx.Player)
+				}
+			}
+
+			switch val1 {
+			case "list", "lst":
+				list := lo.Must(am.GetCharacterList(ctx.Player.UserId))
+				bindingId := getBindingId()
+
+				if len(list) == 0 {
+					ReplyToSender(ctx, msg, fmt.Sprintf("<%s>当前还没有角色列表", ctx.Player.Name))
+				} else {
+					rows := make([]string, 0, len(list))
+					for idx, item := range list {
+						prefix := "[×]"
+						if item.BindingGroupsNum > 0 {
+							prefix = "[★]"
+						}
+						if bindingId == item.ID {
+							prefix = "[√]"
+						}
+						suffix := ""
+						if item.SheetType != "" {
+							suffix = fmt.Sprintf(" #%s", item.SheetType)
+						}
+						rows = append(rows, fmt.Sprintf("%2d %s %s%s", idx+1, prefix, item.Name, suffix))
+					}
+					ReplyToSender(ctx, msg, fmt.Sprintf("<%s>的角色列表为:\n%s\n[√]已绑 [×]未绑 [★]其他群绑定", ctx.Player.Name, strings.Join(rows, "\n")))
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			case "new":
+				name := getNicknameRaw(true, false)
+				if name == "" {
+					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
+
+				VarSetValueStr(ctx, "$t角色名", name)
+				if !am.CharCheckExists(ctx.Player.UserId, name) {
+					item := lo.Must(am.CharNew(ctx.Player.UserId, name, ctx.Group.System))
+					lo.Must0(am.CharBind(item.ID, ctx.Group.GroupId, ctx.Player.UserId))
+					setCurPlayerName(name)
+
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_新建"))
+				} else {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_新建_已存在"))
+				}
+
+				if ctx.Player.AutoSetNameTemplate != "" {
+					_, _ = SetPlayerGroupCardByTemplate(ctx, ctx.Player.AutoSetNameTemplate)
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			case "rename":
+				a := cmdArgs.GetArgN(2)
+				b := cmdArgs.GetArgN(3)
+				var charId string
+
+				if b == "" {
+					b = a
+					charId = getBindingId()
+				} else {
+					charId, _ = am.CharIdGetByName(ctx.Player.UserId, a)
+				}
+
+				if a != "" && b != "" {
+					if charId != "" {
+						if !am.CharCheckExists(ctx.Player.UserId, b) {
+							attrs := lo.Must(am.LoadById(charId))
+							attrs.Name = b
+							if charId == getBindingId() {
+								setCurPlayerName(b)
+							}
+							lo.Must0(am.Save(attrs))
+							ReplyToSender(ctx, msg, "操作完成")
+						} else {
+							ReplyToSender(ctx, msg, "此角色名已存在")
+						}
+					} else {
+						ReplyToSender(ctx, msg, "未找到此角色")
+					}
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+			case "tag":
+				name := getNicknameRaw(false, true)
+
+				VarSetValueStr(ctx, "$t角色名", name)
+				if name != "" {
+					charId := lo.Must(am.CharIdGetByName(ctx.Player.UserId, name))
+					if charId == "" {
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_绑定_失败"))
+					} else {
+						lo.Must0(am.CharBind(charId, ctx.Group.GroupId, ctx.Player.UserId))
+						setCurPlayerName(name)
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_绑定_成功"))
+					}
+				} else {
+					charId := getBindingId()
+					if charId == "" {
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_绑定_并未绑定"))
+					} else {
+						lo.Must0(am.CharBind("", ctx.Group.GroupId, ctx.Player.UserId))
+						attrs := lo.Must(am.LoadById(charId))
+						name = attrs.Name
+						setCurPlayerName(name)
+						VarSetValueStr(ctx, "$t角色名", name)
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_绑定_解除"))
+					}
+				}
+				if ctx.Player.AutoSetNameTemplate != "" {
+					_, _ = SetPlayerGroupCardByTemplate(ctx, ctx.Player.AutoSetNameTemplate)
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			case "load":
+				name := getNicknameRaw(false, true)
+				VarSetValueStr(ctx, "$t角色名", name)
+
+				charId := lo.Must(am.CharIdGetByName(ctx.Player.UserId, name))
+				if charId == "" {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_角色不存在"))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				attrsCur := lo.Must(am.Load(ctx.Group.GroupId, ctx.Player.UserId))
+				if attrsCur == nil {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_角色不存在"))
+				} else {
+					attrs := lo.Must(am.LoadById(charId))
+					attrsCur.Clear()
+					attrs.Range(func(key string, value *ds.VMValue) bool {
+						attrsCur.Store(key, value)
+						return true
+					})
+					lo.Must0(am.Save(attrsCur))
+					setCurPlayerName(name)
+
+					if ctx.Player.AutoSetNameTemplate != "" {
+						_, _ = SetPlayerGroupCardByTemplate(ctx, ctx.Player.AutoSetNameTemplate)
+					}
+
+					VarSetValueStr(ctx, "$t玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_加载成功"))
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			case "save":
+				name := getNickname()
+				if name == "" {
+					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
+
+				if !am.CharCheckExists(ctx.Player.UserId, name) {
+					newItem, _ := am.CharNew(ctx.Player.UserId, name, ctx.Group.System)
+					attrs := lo.Must(am.Load(ctx.Group.GroupId, ctx.Player.UserId))
+
+					if newItem != nil {
+						attrsNew := lo.Must(am.LoadById(newItem.ID))
+						attrs.Range(func(key string, value *ds.VMValue) bool {
+							attrsNew.Store(key, value)
+							return true
+						})
+						lo.Must0(am.Save(attrsNew))
+						VarSetValueStr(ctx, "$t角色名", name)
+						VarSetValueStr(ctx, "$t新角色名", fmt.Sprintf("<%s>", name))
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_储存成功"))
+					} else {
+						VarSetValueStr(ctx, "$t角色名", name)
+						ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_储存失败_已绑定"))
+					}
+				} else {
+					ReplyToSender(ctx, msg, "此角色名已存在")
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			case "untagall":
+				name := getNicknameRaw(false, true)
+				var charId string
+				if name == "" {
+					charId = getBindingId()
+				} else {
+					charId, _ = am.CharIdGetByName(ctx.Player.UserId, name)
+				}
+
+				var lst []string
+				if charId != "" {
+					lst = am.CharUnbindAll(charId)
+				}
+
+				for _, gid := range lst {
+					if gid == ctx.Group.GroupId {
+						ctx.Player.Name = msg.Sender.Nickname
+						ctx.Player.UpdatedAtTime = time.Now().Unix()
+						if ctx.Player.AutoSetNameTemplate != "" {
+							_, _ = SetPlayerGroupCardByTemplate(ctx, ctx.Player.AutoSetNameTemplate)
+						}
+					}
+				}
+
+				if len(lst) > 0 {
+					ReplyToSender(ctx, msg, "绑定已全部解除:\n"+strings.Join(lst, "\n"))
+				} else {
+					ReplyToSender(ctx, msg, "这张卡片并未绑定到任何群")
+				}
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			case "del", "rm":
+				name := getNicknameRaw(false, true)
+				if name == "" {
+					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
+
+				VarSetValueStr(ctx, "$t角色名", name)
+				charId, _ := am.CharIdGetByName(ctx.Player.UserId, name)
+				if charId == "" {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_角色不存在"))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				lst := am.CharGetBindingGroupIdList(charId)
+				if len(lst) > 0 {
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:角色管理_删除失败_已绑定"))
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				if err := am.CharDelete(charId); err != nil {
+					ReplyToSender(ctx, msg, "角色删除失败")
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
+				VarSetValueStr(ctx, "$t角色名", name)
+				VarSetValueStr(ctx, "$t新角色名", fmt.Sprintf("<%s>", name))
+
+				text := DiceFormatTmpl(ctx, "核心:角色管理_删除成功")
+				if getBindingId() == charId {
+					VarSetValueStr(ctx, "$t新角色名", fmt.Sprintf("<%s>", msg.Sender.Nickname))
+					text += "\n" + DiceFormatTmpl(ctx, "核心:角色管理_删除成功_当前卡")
+					ctx.Player.Name = msg.Sender.Nickname
+				}
+				ReplyToSender(ctx, msg, text)
+				return types.CmdExecuteResult{Matched: true, Solved: true}
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+		},
+	}
+
 	helpExt := ".ext list // 查看所有扩展状态\n.ext on <扩展名> // 开启指定扩展\n.ext off <扩展名> // 关闭指定扩展"
 	cmdExt := &types.CmdItemInfo{
 		Name:      "ext",
@@ -908,6 +1221,11 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 	cmdMap["master"] = cmdMaster
 	cmdMap["nn"] = cmdNN
 	cmdMap["userid"] = cmdUserID
+	cmdMap["角色"] = cmdChar
+	cmdMap["ch"] = cmdChar
+	cmdMap["char"] = cmdChar
+	cmdMap["character"] = cmdChar
+	cmdMap["pc"] = cmdChar
 	cmdMap["set"] = cmdSet
 	cmdMap["ext"] = cmdExt
 

@@ -5,6 +5,9 @@ type AttrsUpsertParams struct {
 	Data      []byte `json:"data"`
 	Name      string `json:"name"`
 	SheetType string `json:"sheetType"`
+	OwnerId   string `json:"ownerId"`
+	AttrsType string `json:"attrsType"`
+	IsHidden  bool   `json:"isHidden"`
 }
 
 // AttrsIO 定义了属性数据访问层的接口

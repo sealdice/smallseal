@@ -382,7 +382,7 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 				} else {
 					// 生命值变为大于0，移除死亡豁免标记
 					deathSavingStable(ctx)
-					if newHp > curHpMax {
+					if maxExists && newHp > curHpMax {
 						// 限制不超过hpmax
 						return ds.NewIntVal(curHpMax)
 					}

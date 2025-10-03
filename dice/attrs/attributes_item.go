@@ -20,6 +20,8 @@ type AttributesItem struct {
 	SheetType string `json:"sheetType"` // 卡片类型，如dnd5e coc7
 	OwnerId   string `json:"ownerId"`   // 若有明确归属，就是对应的UniformID
 
+	BindingGroupsNum int `json:"bindingGroupsNum"` // 绑定的群数量，仅供统计展示
+
 	// 其他
 	LastModifiedTime int64 // 上次修改时间
 	LastUsedTime     int64 // 上次使用时间

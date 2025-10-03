@@ -55,8 +55,18 @@ func (m *MemoryAttrsIO) Puts(items []*AttrsUpsertParams) error {
 			existingItem.Data = param.Data
 			existingItem.Name = param.Name
 			existingItem.SheetType = param.SheetType
+			existingItem.OwnerId = param.OwnerId
+			existingItem.AttrsType = param.AttrsType
+			existingItem.IsHidden = param.IsHidden
 			existingItem.LastModifiedTime = time.Now().Unix()
 			existingItem.IsSaved = false
+			if len(param.Data) > 0 {
+				if v, err := ds.VMValueFromJSON(param.Data); err == nil {
+					if dict, ok := v.ReadDictData(); ok {
+						existingItem.valueMap = dict.Dict
+					}
+				}
+			}
 		} else {
 			// 创建新项
 			newItem := &AttributesItem{
@@ -64,10 +74,20 @@ func (m *MemoryAttrsIO) Puts(items []*AttrsUpsertParams) error {
 				Data:             param.Data,
 				Name:             param.Name,
 				SheetType:        param.SheetType,
+				OwnerId:          param.OwnerId,
+				AttrsType:        param.AttrsType,
+				IsHidden:         param.IsHidden,
 				LastModifiedTime: time.Now().Unix(),
 				LastUsedTime:     time.Now().Unix(),
 				valueMap:         &ds.ValueMap{},
 				IsSaved:          false,
+			}
+			if len(param.Data) > 0 {
+				if v, err := ds.VMValueFromJSON(param.Data); err == nil {
+					if dict, ok := v.ReadDictData(); ok {
+						newItem.valueMap = dict.Dict
+					}
+				}
 			}
 			m.items[param.Id] = newItem
 		}
@@ -130,12 +150,12 @@ func (m *MemoryAttrsIO) BindingIdGet(groupId string, userId string) (string, err
 
 	groupBindings, exists := m.bindings[groupId]
 	if !exists {
-		return "", errors.New("no binding found")
+		return "", nil
 	}
 
 	attrsId, exists := groupBindings[userId]
 	if !exists {
-		return "", errors.New("no binding found")
+		return "", nil
 	}
 
 	return attrsId, nil
@@ -167,7 +187,7 @@ func (m *MemoryAttrsIO) Unbind(groupId string, userId string) error {
 
 	groupBindings, exists := m.bindings[groupId]
 	if !exists {
-		return errors.New("no binding found")
+		return nil
 	}
 
 	delete(groupBindings, userId)
