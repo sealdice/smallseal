@@ -17,16 +17,23 @@ import (
 )
 
 type stubDice struct {
-	templates  map[string]*types.GameSystemTemplateV2
+	templates  *utils.SyncMap[string, *types.GameSystemTemplateV2]
 	replies    []*types.MsgToReply
 	extensions map[string]*types.ExtInfo
 }
 
 func newStubDice(tmpl *types.GameSystemTemplateV2) *stubDice {
+	tmplMap := &utils.SyncMap[string, *types.GameSystemTemplateV2]{}
+	tmplMap.Store(tmpl.Name, tmpl)
+
 	return &stubDice{
-		templates:  map[string]*types.GameSystemTemplateV2{tmpl.Name: tmpl},
+		templates:  tmplMap,
 		extensions: make(map[string]*types.ExtInfo),
 	}
+}
+
+func (s *stubDice) GameSystemMapGet() *utils.SyncMap[string, *types.GameSystemTemplateV2] {
+	return s.templates
 }
 
 func (s *stubDice) RegisterExtension(info *types.ExtInfo) {
@@ -37,7 +44,7 @@ func (s *stubDice) RegisterExtension(info *types.ExtInfo) {
 }
 
 func (s *stubDice) GameSystemMapLoad(name string) (*types.GameSystemTemplateV2, error) {
-	if tmpl, ok := s.templates[name]; ok {
+	if tmpl, ok := s.templates.Load(name); ok {
 		return tmpl, nil
 	}
 	return nil, fmt.Errorf("template %s not found", name)
@@ -111,6 +118,17 @@ func minimalTextMap() types.TextTemplateWithWeightDict {
 				toItem("ITEM {$t属性}: {$t旧值}->{$t新值} ({$t增加或减少}{$t表达式}={$t变化值})"),
 			},
 		},
+		"核心": types.TextTemplateWithWeight{
+			"骰点": []types.TextTemplateItem{
+				toItem("{$t结果文本}"),
+			},
+			"骰点_单项结果文本": []types.TextTemplateItem{
+				toItem("{$t表达式文本}{$t计算过程}={$t计算结果}"),
+			},
+			"骰点_原因": []types.TextTemplateItem{
+				toItem("{$t原因句子}"),
+			},
+		},
 	}
 }
 
@@ -163,10 +181,10 @@ func newCoc7TestContext(t *testing.T) (*types.MsgContext, *types.Message, *stubD
 	return ctx, msg, stub
 }
 
-func executeStCommand(t *testing.T, stub *stubDice, ctx *types.MsgContext, msg *types.Message, raw string, cmd *types.CmdItemInfo) (types.CmdExecuteResult, string) {
+func executeCommandWith(t *testing.T, stub *stubDice, ctx *types.MsgContext, msg *types.Message, raw string, cmd *types.CmdItemInfo, names ...string) (types.CmdExecuteResult, string) {
 	t.Helper()
 
-	cmdArgs := types.CommandParse(raw, []string{"st"}, []string{".", "。"}, "", false)
+	cmdArgs := types.CommandParse(raw, names, []string{".", "。"}, "", false)
 	require.NotNilf(t, cmdArgs, "failed to parse command %q", raw)
 
 	ctx.CommandId++
@@ -183,6 +201,10 @@ func executeStCommand(t *testing.T, stub *stubDice, ctx *types.MsgContext, msg *
 	}
 
 	return result, ""
+}
+
+func executeStCommand(t *testing.T, stub *stubDice, ctx *types.MsgContext, msg *types.Message, raw string, cmd *types.CmdItemInfo) (types.CmdExecuteResult, string) {
+	return executeCommandWith(t, stub, ctx, msg, raw, cmd, "st")
 }
 
 func executeStCommands(t *testing.T, stub *stubDice, ctx *types.MsgContext, msg *types.Message, cmd *types.CmdItemInfo, commands ...string) {

@@ -221,8 +221,15 @@ func newVM(mctx *MsgContext) *ds.Context {
 		// 特殊机制: 从模板读取detail进行覆盖
 		for index, i := range details {
 			if (i.Tag == "load" || i.Tag == "load.computed") && mctx.GameSystem != nil && ctx.UpCtx == nil {
-				expr := string(detailResult[i.Begin:i.End])
-				detailExpr, exists := mctx.GameSystem.Attrs.DetailOverwrite[expr]
+				expr := strings.TrimSpace(string(detailResult[i.Begin:i.End]))
+				lookupKey := expr
+				if canonical := mctx.GameSystem.GetAlias(expr); canonical != "" {
+					lookupKey = canonical
+				}
+				detailExpr, exists := mctx.GameSystem.Attrs.DetailOverwrite[lookupKey]
+				if !exists && lookupKey != expr {
+					detailExpr, exists = mctx.GameSystem.Attrs.DetailOverwrite[expr]
+				}
 				if !exists {
 					// 如果没有，尝试使用通配
 					detailExpr = mctx.GameSystem.Attrs.DetailOverwrite["*"]
