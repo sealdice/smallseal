@@ -60,6 +60,7 @@ type ExtInfo struct {
 	// 定时任务列表，用于避免 task 失去引用
 	// taskList []*JsScriptTask `json:"-" yaml:"-"`
 
+	// TODO: 下面这些有没有还要再看，可能会极大省略
 	OnNotCommandReceived func(ctx *MsgContext, msg *Message)                        `jsbind:"onNotCommandReceived" json:"-" yaml:"-"` // 指令过滤后剩下的
 	OnCommandOverride    func(ctx *MsgContext, msg *Message, cmdArgs *CmdArgs) bool `json:"-"                      yaml:"-"`          // 覆盖指令行为
 

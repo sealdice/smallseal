@@ -175,12 +175,15 @@ func cmdStGetItemsForShow(mctx *types.MsgContext, tmpl *types.GameSystemTemplate
 			}
 
 			var v *ds.VMValue
+			baseK := k
 			k, err = tmpl.GetShowKeyAs(mctx, k)
 			if err != nil {
 				return nil, 0, errors.New("模板卡异常(key), 属性: " + k + "\n报错: " + err.Error())
 			}
 
-			v, err = tmpl.GetShowValueAs(mctx, k)
+			// 注: 使用 baseK 的原因是 k 可能会被showAs更改，例如dnd5e会将”运动“修改为“运动*“，以代表熟练，此时k不再匹配
+			v, err = tmpl.GetShowValueAs(mctx, baseK)
+			// 这段可以用来获取实际值，用于一种情况，就是模板中未设定showAs，该value本身是个computed
 			if err == nil && v.TypeId == ds.VMTypeComputedValue {
 				v = v.ComputedExecute(mctx.GetVM(), nil)
 				err = mctx.GetVM().Error
@@ -190,9 +193,24 @@ func cmdStGetItemsForShow(mctx *types.MsgContext, tmpl *types.GameSystemTemplate
 			}
 
 			if index >= topNum {
-				if useLimit && v.TypeId == ds.VMTypeInt && int64(v.MustReadInt()) < limit {
-					limitSkipCount++
-					continue
+				if useLimit {
+					compareVal := ds.IntType(0)
+
+					if v.TypeId == ds.VMTypeInt {
+						compareVal = v.MustReadInt()
+					}
+
+					if v.TypeId == ds.VMTypeString {
+						// 如果是个字符串 试试转换
+						if _v, err := strconv.ParseInt(v.ToString(), 10, 64); err == nil {
+							compareVal = ds.IntType(_v)
+						}
+					}
+
+					if int64(compareVal) < limit {
+						limitSkipCount++
+						continue
+					}
 				}
 			}
 
@@ -492,13 +510,12 @@ func getCmdStBase(soi CmdStOverrideInfo) *types.CmdItemInfo {
 			// if tmplShow != tmpl {
 			// 	mctx.Eval(tmplShow.PreloadCode, nil)
 			// }
-			if tmpl.PreloadCode != "" {
-				mctx.Eval(tmpl.PreloadCode, nil)
-				if mctx.GetVM().Error != nil {
-					ReplyToSender(mctx, msg, "属性设置指令执行失败："+mctx.GetVM().Error.Error())
-					return types.CmdExecuteResult{Matched: true, Solved: true}
-				}
-			}
+			// if tmpl.InitScript != "" {
+			// 	if mctx.GetVM().Error != nil {
+			// 		ReplyToSender(mctx, msg, "属性设置指令执行失败："+mctx.GetVM().Error.Error())
+			// 		return types.CmdExecuteResult{Matched: true, Solved: true}
+			// 	}
+			// }
 
 			if soi.CommandSolve != nil {
 				ret := soi.CommandSolve(ctx, msg, cmdArgs)

@@ -1,7 +1,11 @@
 package types
 
+import "github.com/sealdice/smallseal/utils"
+
 type DiceLike interface {
 	RegisterExtension(extInfo *ExtInfo)
+	GameSystemMapGet() *utils.SyncMap[string, *GameSystemTemplateV2]
+
 	GameSystemMapLoad(name string) (*GameSystemTemplateV2, error)
 	ExtFind(s string, fromJS bool) *ExtInfo
 	GetExtList() []*ExtInfo

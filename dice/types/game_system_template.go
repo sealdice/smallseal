@@ -24,7 +24,7 @@ type GameSystemTemplateV2 struct {
 	Version     string   `yaml:"version"`     // 版本
 	UpdatedTime string   `yaml:"updatedTime"` // 更新日期
 	TemplateVer string   `yaml:"templateVer"` // 模板版本
-	PreloadCode string   `yaml:"preloadCode"` // 预加载代码
+	InitScript  string   `yaml:"initScript"`  // 预加载代码
 	Attrs       Attrs    `yaml:"attrs"`       // 属性配置
 	Alias       Alias    `yaml:"alias"`       // 别名配置
 	Commands    Commands `yaml:"commands"`    // 命令配置
@@ -37,7 +37,7 @@ type GameSystemTemplateV2 struct {
 type Attrs struct {
 	Defaults         map[string]int    `yaml:"defaults"`         // 默认值
 	DefaultsComputed map[string]string `yaml:"defaultsComputed"` // 计算默认值
-	DetailOverwrite  map[string]string `yaml:"detailOverwrite"`  // 详情重写
+	DetailOverwrite  map[string]string `yaml:"detailOverwrite"`  // 计算过程重写
 
 	DefaultsComputedReal map[string]*ds.VMValue `json:"-" yaml:"-"`
 }
@@ -54,11 +54,11 @@ type Commands struct {
 
 // SetConfig set命令配置
 type SetConfig struct {
-	DiceSides     int      `yaml:"diceSides"`     // 骰子面数
-	DiceSidesExpr string   `yaml:"diceSidesExpr"` // 骰子面数表达式
-	EnableTip     string   `yaml:"enableTip"`     // 启用提示
-	Keys          []string `yaml:"keys"`          // 可用于 .set xxx 的key
-	RelatedExt    []string `yaml:"relatedExt"`    // 关联扩展
+	// DiceSides  int      `yaml:"diceSides"`  // 骰子面数
+	DiceSideExpr string   `yaml:"diceSideExpr"` // 骰子面数表达式
+	EnableTip    string   `yaml:"enableTip"`    // 启用提示
+	Keys         []string `yaml:"keys"`         // 可用于 .set xxx 的key
+	RelatedExt   []string `yaml:"relatedExt"`   // 关联扩展
 }
 
 // SnConfig sn命令配置
@@ -208,7 +208,7 @@ func (t *GameSystemTemplateV2) GetShowKeyAs(ctx *MsgContext, k string) (string, 
 	var err error
 	// 如果存在showKeyAs，那么就根据表达式求值
 	if expr, exists := t.Commands.St.Show.ShowKeyAs[k]; exists {
-		r, _, err = ctx.EvalBase(expr, &ds.RollConfig{
+		r, _, err = ctx.EvalFString(expr, &ds.RollConfig{
 			DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
 		})
 		if err == nil {
@@ -223,8 +223,7 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 	var err error
 
 	if expr, exists := t.Commands.St.Show.ShowValueAs[k]; exists {
-		// ctx.SystemTemplate = t
-		r, _, err = ctx.EvalBase(expr, &ds.RollConfig{
+		r, _, err = ctx.EvalFString(expr, &ds.RollConfig{
 			DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
 		})
 		if err == nil {
@@ -234,9 +233,8 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 
 	// 通配值
 	if expr, exists := t.Commands.St.Show.ShowValueAs["*"]; exists {
-		// ctx.SystemTemplate = t
-		// 这个 store 是干啥的，不知道啥地方用到了？
-		// ctx.vm.StoreNameLocal("name", ds.NewStrVal(baseK))
+		// 这里存入k是因为接下来模板可能会用到原始key，例如 loadRaw(name)
+		ctx.vm.StoreNameLocal("name", ds.NewStrVal(k))
 		r, _, err = ctx.EvalFString(expr, nil)
 		if err == nil {
 			return r, nil

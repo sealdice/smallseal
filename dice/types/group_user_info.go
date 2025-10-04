@@ -59,7 +59,7 @@ type GroupInfo struct {
 	DiceIDExistsMap *utils.SyncMap[string, bool] `json:"diceIdExistsMap" yaml:"-"`            // 对应的骰子ID(格式 平台:ID)是否存在于群内
 	BotList         *utils.SyncMap[string, bool] `json:"botList"         yaml:"botList,flow"` // 其他骰子列表
 	DiceSideExpr    string                       `json:"diceSideExpr"    yaml:"diceSideExpr"` //
-	System          string                       `json:"system"          yaml:"system"`       // 规则系统，概念同bcdice的gamesystem，距离如dnd5e coc7
+	System          string                       `json:"system"          yaml:"system"`       // 规则系统，概念同bcdice的gamesystem，例如dnd5e coc7
 	// DiceSideNum     int64                        `json:"diceSideNum"     yaml:"diceSideNum"`  // 以后可能会支持 1d4 这种默认面数，暂不开放给js
 
 	HelpPackages []string `json:"helpPackages"   yaml:"-"`
@@ -110,25 +110,39 @@ func (g *GroupInfo) SetExtensionActive(extName string, active bool) {
 
 // GetActiveExtensions 获取当前群组中所有激活的扩展列表
 func (g *GroupInfo) GetActiveExtensions(allExtensions []*ExtInfo) []*ExtInfo {
-	var activeExts []*ExtInfo
-	for _, ext := range allExtensions {
-		// 检查扩展是否在激活状态映射表中被明确设置
+	var coreExts []*ExtInfo
+	var systemExts []*ExtInfo
+	var otherExts []*ExtInfo
+	systemName := strings.ToLower(g.System)
+
+	isActive := func(ext *ExtInfo) bool {
 		if g.ExtActiveStates != nil {
 			if active, exists := g.ExtActiveStates.Load(ext.Name); exists {
-				if active {
-					activeExts = append(activeExts, ext)
-				}
-				continue
+				return active
 			}
 		}
-		// 如果没有明确设置，则使用扩展的AutoActive属性
 		if ext.AutoActive {
-			activeExts = append(activeExts, ext)
-			// 同时将其状态记录到映射表中
 			g.SetExtensionActive(ext.Name, true)
+			return true
+		}
+		return false
+	}
+
+	for _, ext := range allExtensions {
+		if ext == nil || !isActive(ext) {
+			continue
+		}
+		switch {
+		case strings.EqualFold(ext.Name, "core"):
+			coreExts = append(coreExts, ext)
+		case systemName != "" && strings.EqualFold(ext.Name, systemName):
+			systemExts = append(systemExts, ext)
+		default:
+			otherExts = append(otherExts, ext)
 		}
 	}
-	return activeExts
+
+	return append(append(coreExts, systemExts...), otherExts...)
 }
 
 func (g *GroupInfo) ensureExtStates() {

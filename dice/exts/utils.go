@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	ds "github.com/sealdice/dicescript"
 
 	"github.com/sealdice/smallseal/dice/types"
 	"github.com/sealdice/smallseal/utils"
@@ -164,4 +165,11 @@ func SetPlayerGroupCardByTemplate(ctx *types.MsgContext, tmpl string) (string, e
 
 	// ctx.EndPoint.Adapter.SetGroupCardName(ctx, text)
 	return "", nil
+}
+
+func CheckValueEmpty(v *ds.VMValue) bool {
+	if v == nil || v.TypeId == ds.VMTypeNull {
+		return true
+	}
+	return v.AsBool()
 }

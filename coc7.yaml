@@ -126,13 +126,6 @@ attrs: # 属性
     语言: 教育 # 语言的默认值随着教育增长而增加，但也可以是不同的值
     闪避: 敏捷 / 2
 
-buff:
-  - keys: 力量
-    keyPattern: 力量|体型
-    type: rc
-    name: 加值
-    add: d10 + 2 # 这是一个算式，载入vm执行
-
 alias: # 别名，所有数组中的别名，在读取和写入时将被替换成左边的名字
   db: [DB, 伤害加值]
   乔装: [喬裝]
@@ -244,11 +237,9 @@ alias: # 别名，所有数组中的别名，在读取和写入时将被替换�
   魔法值: [mp, 魔法, 魔力, 魔力值]
   魔法值上限: [mpmax, 魔法上限, 蓝量上限, 藍量上限]
 
-
 commands:
   set:
-    diceSides: 100
-    enableTip: 已切换至100面骰，并自动开启coc7扩展
+    diceSideExpr: '100'
     keys:
       - coc
       - coc7
@@ -275,12 +266,6 @@ commands:
         魔法值: '{魔法值}/{魔法值上限}'
       showKeyAs:
         生命值: '生命'
-
-    write: # 写入时的值
-
-    read: # 读取时的实际数值
-
-    export: # 导出时的值
 
 
 textMap: # 特殊扩展

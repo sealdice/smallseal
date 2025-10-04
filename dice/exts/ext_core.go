@@ -43,19 +43,15 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
 			}
 
-			// TODO: SystemTemplate和Config字段在当前版本中不存在，暂时注释掉
-			// ctx.SystemTemplate = ctx.Group.GetCharTemplate(ctx.Dice)
-			// if ctx.Dice.Config.CommandCompatibleMode {
-			//	if (cmdArgs.Command == "rd" || cmdArgs.Command == "rhd" || cmdArgs.Command == "rdh") && len(cmdArgs.Args) >= 1 {
-			//		if m, _ := regexp.MatchString(`^\d|优势|劣势|\+|-`, cmdArgs.CleanArgs); m {
-			//			if cmdArgs.IsSpaceBeforeArgs {
-			//				cmdArgs.CleanArgs = "d " + cmdArgs.CleanArgs
-			//			} else {
-			//				cmdArgs.CleanArgs = "d" + cmdArgs.CleanArgs
-			//			}
-			//		}
-			//	}
-			// }
+			if (cmdArgs.Command == "rd" || cmdArgs.Command == "rhd" || cmdArgs.Command == "rdh") && len(cmdArgs.Args) >= 1 {
+				if m, _ := regexp.MatchString(`^\d|优势|劣势|\+|-`, cmdArgs.CleanArgs); m {
+					if cmdArgs.IsSpaceBeforeArgs {
+						cmdArgs.CleanArgs = "d " + cmdArgs.CleanArgs
+					} else {
+						cmdArgs.CleanArgs = "d" + cmdArgs.CleanArgs
+					}
+				}
+			}
 
 			var r *ds.VMValue
 			var commandInfoItems []any
@@ -68,7 +64,8 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				if len(cmdArgs.Args) >= 1 { //nolint:nestif
 					var err error
 					r, detail, err = ctx.EvalBase(cmdArgs.CleanArgs, &ds.RollConfig{
-						DisableStmts: true,
+						DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
+						DisableStmts:        true,
 					})
 
 					// TODO: r变量和相关方法不存在，暂时注释掉
@@ -81,8 +78,8 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 						//	defExpr = ctx.diceExprOverwrite
 						// }
 						r, detail, err = ctx.EvalBase(defExpr, &ds.RollConfig{
-							// DefaultDiceSideNum: getDefaultDicePoints(ctx),
-							DisableStmts: true,
+							DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
+							DisableStmts:        true,
 						})
 					}
 
@@ -145,9 +142,8 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				} else {
 					var val int64
 					var detail string
-					// dicePoints := getDefaultDicePoints(ctx)
 
-					dicePoints := "100"
+					dicePoints := ctx.GetDefaultDicePoints()
 					// TODO: ctx.diceExprOverwrite字段在MsgContext中不存在，暂时注释掉
 					// if ctx.diceExprOverwrite != "" {
 					//	r, detail, _ = DiceExprEvalBase(ctx, cmdArgs.CleanArgs, RollExtraFlags{
@@ -160,7 +156,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 					//	}
 					// } else {
 					r := ctx.Eval("d", &ds.RollConfig{
-						DefaultDiceSideExpr: dicePoints,
+						DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
 						DisableStmts:        true,
 					})
 					if r != nil && r.TypeId == ds.VMTypeInt {
@@ -309,7 +305,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 			}
 
 			tmpl := ctx.GetCharTemplate()
-			ctx.Eval(tmpl.PreloadCode, nil)
+			ctx.Eval(tmpl.InitScript, nil)
 			val := cmdArgs.GetArgN(1)
 
 			if val != "" {
@@ -744,27 +740,54 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				ctx.Group.System = ""
 				ctx.Group.UpdatedAtTime = time.Now().Unix()
 				ReplyToSender(ctx, msg, "已清除群默认骰子面数设置")
-			case "dnd", "dnd5e":
-				ctx.Group.DiceSideExpr = "d20"
-				ctx.Group.System = "dnd5e"
-				ctx.Group.UpdatedAtTime = time.Now().Unix()
-				ctx.GameSystem, _ = ctx.Dice.GameSystemMapLoad("dnd5e")
-				if ext := ctx.Dice.ExtFind("dnd5e", false); ext != nil {
-					ctx.Group.ExtActive(ext)
-				}
-				ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
-				ReplyToSender(ctx, msg, "已切换至 DND 模式，默认骰子面数 d20")
-			case "coc", "coc7":
-				ctx.Group.DiceSideExpr = "d100"
-				ctx.Group.System = "coc7"
-				ctx.Group.UpdatedAtTime = time.Now().Unix()
-				ctx.GameSystem, _ = ctx.Dice.GameSystemMapLoad("coc7")
-				if ext := ctx.Dice.ExtFind("coc7", false); ext != nil {
-					ctx.Group.ExtActive(ext)
-				}
-				ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
-				ReplyToSender(ctx, msg, "已切换至 COC 模式，默认骰子面数 d100")
+
+			case "list":
+				text := "当前可用规则:\n"
+				idx := 1
+				ctx.Dice.GameSystemMapGet().Range(func(key string, tmpl *types.GameSystemTemplateV2) bool {
+					text += fmt.Sprintf("%2d. [%s] %s %s\n", idx, tmpl.Name, tmpl.FullName, tmpl.Commands.Set.DiceSideExpr)
+					idx++
+					return true
+				})
+				text += "\n可使用 .set <规则名> 切换规则，如 .set coc7"
+				ReplyToSender(ctx, msg, text)
 			default:
+				var found bool
+				ctx.Dice.GameSystemMapGet().Range(func(key string, tmpl *types.GameSystemTemplateV2) bool {
+					isMatch := false
+					for _, k := range tmpl.Commands.Set.Keys {
+						if strings.EqualFold(sub, k) {
+							isMatch = true
+							break
+						}
+					}
+					if isMatch {
+						ctx.Group.System = key
+						ctx.GameSystem = tmpl
+						ctx.Group.DiceSideExpr = tmpl.Commands.Set.DiceSideExpr
+						ctx.Group.UpdatedAtTime = time.Now().Unix()
+
+						extNames := []string{}
+						for _, name := range tmpl.Commands.Set.RelatedExt {
+							// 开启相关扩展
+							ei := ctx.Dice.ExtFind(name, false)
+							extNames = append(extNames, name)
+							if ei != nil {
+								ctx.Group.ExtActive(ei)
+								ctx.Group.ActivatedExtList = ctx.Group.GetActiveExtensions(ctx.Dice.GetExtList())
+							}
+						}
+
+						ReplyToSender(ctx, msg, fmt.Sprintf("已切换至 %s(%s) 规则，默认骰子面数 %s，自动启用关联扩展: %s", tmpl.FullName, tmpl.Name, strings.ToUpper(tmpl.Commands.Set.DiceSideExpr), strings.Join(extNames, ", ")))
+						found = true
+						return false
+					}
+					return true
+				})
+				if found {
+					return types.CmdExecuteResult{Matched: true, Solved: true}
+				}
+
 				expr := strings.ToLower(cmdArgs.GetArgN(1))
 				if expr == "" {
 					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}

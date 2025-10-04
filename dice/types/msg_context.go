@@ -45,6 +45,7 @@ type MsgContext struct {
 	vm   *ds.Context
 	Dice DiceLike
 
+	// 指令过程记录
 	LoadRecords       []*LoadRecord
 	CommandFormatInfo []*CommandFormatInfo
 }
@@ -57,7 +58,17 @@ func (ctx *MsgContext) LoadRecordFetchAndClear() []*LoadRecord {
 
 func (ctx *MsgContext) GetVM() *ds.Context {
 	if ctx.vm == nil {
-		ctx.vm = newVM(ctx, ctx.Group.GroupId, ctx.Player.UserId, ctx.AttrsManager, ctx.GameSystem, ctx.TextTemplateMap, ctx.FallbackTextTemplate)
+		ctx.vm = newVM(ctx)
+
+		gameSystem := ctx.GameSystem
+		if gameSystem != nil {
+			ctx.Eval(gameSystem.InitScript, nil)
+			if ctx.vm.Error != nil {
+				// 即使报错了，直接进行跳过，不卡住流程
+				ctx.vm.Error = nil
+			}
+		}
+
 	}
 	return ctx.vm
 }

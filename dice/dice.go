@@ -49,11 +49,16 @@ func NewDice() *Dice {
 	d.attrsManager.Init()
 	d.Config.CommandPrefix = []string{"."}
 
-	coc7, err := types.LoadGameSystemTemplate("./coc7.yaml")
-	if err != nil {
-		panic(err)
+	for _, tmplPath := range []string{
+		"./coc7.yaml",
+		"./dnd5e.yaml",
+	} {
+		gs, err := types.LoadGameSystemTemplate(tmplPath)
+		if err != nil {
+			panic(err)
+		}
+		d.gameSystem.Store(gs.Name, gs)
 	}
-	d.gameSystem.Store(coc7.Name, coc7)
 
 	exts.RegisterBuiltinExtCore(d)
 	exts.RegisterBuiltinExtCoc7(d)
@@ -269,6 +274,10 @@ func (d *Dice) GameSystemMapLoad(name string) (*types.GameSystemTemplateV2, erro
 		return gameSystem, nil
 	}
 	return nil, fmt.Errorf("game system not found: %s", name)
+}
+
+func (d *Dice) GameSystemMapGet() *utils.SyncMap[string, *types.GameSystemTemplateV2] {
+	return &d.gameSystem
 }
 
 func (d *Dice) RegisterMessageInHook(name string, priority types.HookPriority, hook types.MessageInHook) (types.HookHandle, error) {

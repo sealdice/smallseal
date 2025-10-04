@@ -245,7 +245,7 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 			suffixText := ""
 			vm := ctx.GetVM()
 			orgV, err := vm.RunExpr("$org_"+k, true)
-			if orgV != nil {
+			if CheckValueEmpty(orgV) {
 				if orgV.TypeId == ds.VMTypeComputedValue {
 					return "" // 一般有特殊的处理，直接放弃
 				}
@@ -457,7 +457,7 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 					restText = strings.TrimSpace(restText[len(m):])
 				}
 				// 获取角色模板
-				tmpl := mctx.GetCharTemplate()
+				// tmpl := mctx.GetCharTemplate()
 				// 初始化多轮检定结果保存数组
 				textList := make([]string, 0)
 				// 多轮检定判断
@@ -482,8 +482,6 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 				var commandItems = make([]interface{}, 0)
 				// 循环N轮
 				for range round {
-					// 执行预订的code
-					mctx.Eval(tmpl.PreloadCode, nil)
 					// 为rc设定属性豁免
 					setDndReadForVM(mctx, true)
 					// 准备要处理的函数，为了能够读取到 d20 的出目，先不加上加值
