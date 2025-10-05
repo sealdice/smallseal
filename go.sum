@@ -1,3 +1,5 @@
+github.com/Masterminds/semver/v3 v3.4.0 h1:Zog+i5UMtVoCU8oKka5P7i9q9HgrJeGzI9SA1Xbatp0=
+github.com/Masterminds/semver/v3 v3.4.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
 github.com/Szzrain/Milky-go-sdk v0.3.9 h1:88q1YkcSTeqQBSp9TAYpHOiKvWhGwuY9N1xiXe7XiAQ=
 github.com/Szzrain/Milky-go-sdk v0.3.9/go.mod h1:vyl5G/6TQha+Ygf9ZWkDN//7dJFq2V0ezdk3Rm2kDKQ=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

@@ -191,6 +191,9 @@ func GetValueNameByAlias(s string, alias map[string][]string) string {
 
 func SetTempVars(ctx *types.MsgContext, qqNickname string) {
 	// 设置临时变量
+	VarSetValueStr(ctx, "常量:APPNAME", types.APPNAME)
+	VarSetValueStr(ctx, "常量:VERSION", types.VERSION.String())
+
 	if ctx.Player != nil {
 		pcName := ctx.Player.Name
 		pcName = strings.ReplaceAll(pcName, "\n", "")

@@ -3,6 +3,7 @@ module github.com/sealdice/smallseal
 go 1.24.6
 
 require (
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/Szzrain/Milky-go-sdk v0.3.9
 	github.com/gorilla/websocket v1.5.3
 	github.com/lascape/sat v1.0.4
