@@ -1227,7 +1227,8 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 			SetTempVars(mctx, mctx.Player.Name) // 信息里没有QQ昵称，用这个顶一下
 			VarSetValueStr(mctx, "$t结果文本", DiceFormatTmpl(mctx, "COC:理智检定_单项结果文本"))
 
-			// VarSetValueInt64(mctx, mctx.Player.GetValueNameByAlias("理智", tmpl.Alias), sanNew)
+			sanAttrName := GetValueNameByAlias("理智", tmpl.Alias)
+			VarSetValueInt64(mctx, sanAttrName, sanNew)
 
 			// 输出结果
 			VarSetValueInt64(mctx, "$t新值", sanNew)

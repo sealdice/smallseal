@@ -35,7 +35,11 @@ func (cb *ob11Callback) OnMessageReceived(info *adapters.MessageSendCallbackInfo
 		return
 	}
 	// fmt.Printf("OnMessageReceived: %s, msg=%s\n", string(jsonInfo), info.Message.Segments.ToText())
-	fmt.Printf("[Msg] %s, <%s>(%s): %s\n", info.Message.GroupID, info.Sender.UserName, info.Sender.UserId, info.Message.Segments.ToText())
+	if info.Sender == nil {
+		fmt.Printf("[Msg] %s, <%s>(%s): %s\n", info.Message.GroupID, "nil", "nil", info.Message.Segments.ToText())
+	} else {
+		fmt.Printf("[Msg] %s, <%s>(%s): %s\n", info.Message.GroupID, info.Sender.UserName, info.Sender.UserId, info.Message.Segments.ToText())
+	}
 
 	if cb.dice != nil && info.Message != nil {
 		cb.dice.Execute("", info.Message)

@@ -446,3 +446,31 @@ func TestCoc7StComplexExpressions(t *testing.T) {
 	require.Equal(t, int64(-4), attrIntValue(t, ctx, attrsItem, "体型"))
 	require.Equal(t, int64(-1), attrIntValue(t, ctx, attrsItem, "测试测试3"))
 }
+
+func TestCoc7SanCheckPersistsToAttributes(t *testing.T) {
+	ctx, msg, stub := newCoc7TestContext(t)
+
+	RegisterBuiltinExtCoc7(stub)
+	ext, ok := stub.extensions["coc7"]
+	require.True(t, ok)
+
+	ctx.Group.ExtActive(ext)
+
+	cmdSc, ok := ext.CmdMap["sc"]
+	require.True(t, ok)
+
+	cmdSt := getCmdStBase(CmdStOverrideInfo{})
+
+	executeStCommands(t, stub, ctx, msg, cmdSt, ".stsan60")
+
+	attrsItem := lo.Must(ctx.AttrsManager.Load(ctx.Group.GroupId, ctx.Player.UserId))
+	require.Equal(t, int64(60), attrIntValue(t, ctx, attrsItem, "san"))
+
+	// 第一次检定 52，因此扣除6点
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".sc 52 6/11", cmdSc, "sc")
+	require.Equal(t, int64(54), attrIntValue(t, ctx, attrsItem, "san"))
+
+	// 第二次检定 51，扣除5点。之前bug为sc不能扣除理智
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".sc 51 5/9", cmdSc, "sc")
+	require.Equal(t, int64(49), attrIntValue(t, ctx, attrsItem, "san"))
+}
