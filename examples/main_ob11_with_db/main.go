@@ -29,12 +29,13 @@ func (cb *ob11Callback) OnError(err error) {
 }
 
 func (cb *ob11Callback) OnMessageReceived(info *adapters.MessageSendCallbackInfo) {
-	jsonInfo, err := json.Marshal(info)
+	_, err := json.Marshal(info)
 	if err != nil {
 		fmt.Printf("OnMessageReceived: marshal err, info=%v, err=%v\n", info, err)
 		return
 	}
-	fmt.Printf("OnMessageReceived: %s, msg=%s\n", string(jsonInfo), info.Message.Segments.ToText())
+	// fmt.Printf("OnMessageReceived: %s, msg=%s\n", string(jsonInfo), info.Message.Segments.ToText())
+	fmt.Printf("[Msg] %s, <%s>(%s): %s\n", info.Message.GroupID, info.Sender.UserName, info.Sender.UserId, info.Message.Segments.ToText())
 
 	if cb.dice != nil && info.Message != nil {
 		cb.dice.Execute("", info.Message)

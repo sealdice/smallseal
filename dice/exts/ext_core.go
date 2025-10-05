@@ -738,6 +738,18 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				ReplyToSender(ctx, msg, "仅群聊中可设置默认面数")
 				return types.CmdExecuteResult{Matched: true, Solved: true}
 			}
+			persistGroupState := func() {
+				if ctx.Dice == nil || ctx.Group == nil {
+					return
+				}
+				groupID := msg.GroupID
+				if groupID == "" {
+					groupID = ctx.Group.GroupId
+				}
+				if groupID != "" {
+					ctx.Dice.PersistGroupInfo(groupID, ctx.Group)
+				}
+			}
 			sub := strings.ToLower(cmdArgs.GetArgN(1))
 			switch sub {
 			case "", "info":
@@ -754,6 +766,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				ctx.Group.DiceSideExpr = ""
 				ctx.Group.System = ""
 				ctx.Group.UpdatedAtTime = time.Now().Unix()
+				persistGroupState()
 				ReplyToSender(ctx, msg, "已清除群默认骰子面数设置")
 
 			case "list":
@@ -794,6 +807,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 						}
 
 						ReplyToSender(ctx, msg, fmt.Sprintf("已切换至 %s(%s) 规则，默认骰子面数 %s，自动启用关联扩展: %s", tmpl.FullName, tmpl.Name, strings.ToUpper(tmpl.Commands.Set.DiceSideExpr), strings.Join(extNames, ", ")))
+						persistGroupState()
 						found = true
 						return false
 					}
@@ -812,6 +826,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				}
 				ctx.Group.DiceSideExpr = expr
 				ctx.Group.UpdatedAtTime = time.Now().Unix()
+				persistGroupState()
 				ReplyToSender(ctx, msg, fmt.Sprintf("已将群默认骰子面数设置为 %s", strings.ToUpper(expr)))
 			}
 			return types.CmdExecuteResult{Matched: true, Solved: true}
