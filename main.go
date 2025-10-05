@@ -32,7 +32,7 @@ func main() {
 		_ = f.Close()
 	}
 
-	fmt.Println("DiceScript Shell v0.0.1")
+	fmt.Println("Small Seal Shell v0.0.1")
 	ccTimes := 0
 
 	d.CallbackForSendMsg.Store("console", func(msg *types.MsgToReply) {

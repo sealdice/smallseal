@@ -120,6 +120,17 @@ func minimalTextMap() types.TextTemplateWithWeightDict {
 				toItem("ITEM {$t属性}: {$t旧值}->{$t新值} ({$t增加或减少}{$t表达式}={$t变化值})"),
 			},
 		},
+		"DND": types.TextTemplateWithWeight{
+			"检定": []types.TextTemplateItem{
+				toItem("{$t玩家}的\"{$t技能}\"检定（DND5E）结果为: {$t检定过程文本} = {$t检定结果}"),
+			},
+			"检定_单项结果文本": []types.TextTemplateItem{
+				toItem("{$t检定过程文本} = {$t检定结果}"),
+			},
+			"检定_多轮": []types.TextTemplateItem{
+				toItem("对{$t玩家}的\"{$t技能}\"进行了{$t次数}次检定（DND5E），结果为:\n{$t结果文本}"),
+			},
+		},
 		"核心": types.TextTemplateWithWeight{
 			"骰点": []types.TextTemplateItem{
 				toItem("{$t结果文本}"),
@@ -348,6 +359,7 @@ func TestCoc7StExport(t *testing.T) {
 	require.Contains(t, reply, "敏捷:60")
 	require.Contains(t, reply, "图书馆使用:45")
 	require.Contains(t, reply, "调查员A")
+	require.NotContains(t, reply, "&db:")
 }
 
 func TestCoc7StExportEmpty(t *testing.T) {

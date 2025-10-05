@@ -216,3 +216,19 @@ func TestDnd5eRollUsesComputedAttr(t *testing.T) {
 		require.True(t, strings.HasSuffix(reply, "=9"), "expected roll reply to end with '=9', got %q", reply)
 	}
 }
+
+func TestDnd5eRaAbilityDisplaysModifierDetail(t *testing.T) {
+	ctx, msg, stub, stCmd := newDnd5eTestContext(t)
+
+	executeStCommands(t, stub, ctx, msg, stCmd, ".st 力量*:18")
+
+	ext, ok := stub.extensions["dnd5e"]
+	require.True(t, ok, "dnd5e extension should be registered")
+
+	cmdRc, ok := ext.CmdMap["rc"]
+	require.True(t, ok, "dnd5e extension should provide rc command")
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".ra 力量", cmdRc, "rc", "ra", "rah", "rch", "drc")
+	require.NotEmpty(t, reply)
+	require.Containsf(t, reply, "+ 4[力量调整值4]", "expected ability check detail to include ability modifier detail, got %q", reply)
+}
