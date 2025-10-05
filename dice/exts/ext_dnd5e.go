@@ -1221,7 +1221,7 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 					if vm.Error != nil || r == nil {
 						break
 					}
-					result := r.ToString() + "\n"
+					result := r.ToString()
 					ss = append(ss, result)
 				} else {
 					r, _, _ := ctx.EvalFString(`{4d6k3}, {4d6k3}, {4d6k3}, {4d6k3}, {4d6k3}, {4d6k3}`, nil)
@@ -1243,7 +1243,7 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 						items = append(items, strconv.FormatInt(i, 10))
 					}
 
-					ret := fmt.Sprintf("[%s] = %d\n", strings.Join(items, ", "), total)
+					ret := fmt.Sprintf("[%s] = %d", strings.Join(items, ", "), total)
 					ss = append(ss, ret)
 				}
 			}

@@ -4,10 +4,8 @@ package types
 
 import (
 	"bytes"
-	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -135,20 +133,20 @@ func newVM(mctx *MsgContext) *ds.Context {
 	vm.Config.HookValueLoadPre = func(ctx *ds.Context, name string) (string, *ds.VMValue) {
 		re := regexp.MustCompile(`^(困难|极难|大成功|常规|失败|困難|極難|常規|失敗)?([^\d]+)(\d+)?$`)
 		m := re.FindStringSubmatch(name)
-		var cocFlagVarPrefix string
+		// var cocFlagVarPrefix string
 
 		if len(m) > 0 {
-			if m[1] != "" {
-				cocFlagVarPrefix = m[1]
-				name = name[len(m[1]):]
-			}
+			// if m[1] != "" {
+			// 	cocFlagVarPrefix = m[1]
+			// 	name = name[len(m[1]):]
+			// }
 
 			// 有末值时覆盖，有初值时
-			if m[3] != "" {
-				v, _ := strconv.ParseInt(m[3], 10, 64)
-				fmt.Println("COC值:", name, cocFlagVarPrefix)
-				return name, ds.NewIntVal(ds.IntType(v))
-			}
+			// if m[3] != "" {
+			// 	v, _ := strconv.ParseInt(m[3], 10, 64)
+			// 	fmt.Println("COC值:", name, cocFlagVarPrefix)
+			// 	return name, ds.NewIntVal(ds.IntType(v))
+			// }
 		}
 
 		return name, nil
