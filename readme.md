@@ -21,8 +21,19 @@ DiceScript Shell v0.0.1
 * 指令解析
 * ~~实现 Text 和 Segment[] 的无缝互转~~
 * 想一下 message_old.go 里面的 Message 能否和返回的那个 MsgToReply 统一化？
-* 重新实现难度检定
+* ~~重新实现coc难度检定~~
 * detailOverwrite 机制对同义词无效，例如 .r pp 有效，但 .r pw 无效
+* 可能与ds有关：需要一个方便的办法去设置detail因为现在的 detail 机制只能处理最上面一层，深层是自动的，无法进行重写
+
+### 模块对比
+√ core (builtins)
+√ coc7
+√ dnd5e
+reply
+helpdoc
+黑名单
+log
+fun
 
 ## 内置扩展函数
 

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/samber/lo"
@@ -18,9 +19,9 @@ import (
 
 // 先屏蔽掉这两个
 var (
-	//go_embed coc7_fear.txt
+	//go:embed coc7_fear.txt
 	fearListText string
-	//go_embed coc7_mania.txt
+	//go:embed coc7_mania.txt
 	maniaListText string
 )
 
@@ -33,6 +34,41 @@ var difficultyPrefixMap = map[string]int{
 	"困難":  2,
 	"極難":  3,
 	"常規":  1,
+}
+
+var (
+	SetCocRulePrefixText = map[int]string{
+		0:  "0",
+		1:  "1",
+		2:  "2",
+		3:  "3",
+		4:  "4",
+		5:  "5",
+		11: "DeltaGreen",
+	}
+
+	SetCocRuleText = map[int]string{
+		0:  "出1大成功\n不满50出96-100大失败，满50出100大失败(COC7规则书)",
+		1:  "不满50出1大成功，满50出1-5大成功\n不满50出96-100大失败，满50出100大失败",
+		2:  "出1-5且判定成功为大成功\n出96-100且判定失败为大失败",
+		3:  "出1-5大成功\n出96-100大失败(即大成功/大失败时无视判定结果)",
+		4:  "出1-5且≤(成功率/10)为大成功\n不满50出>=96+(成功率/10)为大失败，满50出100大失败",
+		5:  "出1-2且≤(成功率/5)为大成功\n不满50出96-100大失败，满50出99-100大失败",
+		11: "出1或检定成功基础上个位十位相同为大成功\n出100或检定失败基础上个位十位相同为大失败\n此规则无困难成功或极难成功",
+	}
+)
+
+func setRuleByName(ctx *types.MsgContext, name string) {
+	if ctx == nil || ctx.Group == nil || ctx.Dice == nil {
+		return
+	}
+
+	if ext := ctx.Dice.ExtFind(name, false); ext != nil {
+		ctx.Group.ExtActive(ext)
+	}
+
+	ctx.Group.System = name
+	ctx.Group.UpdatedAtTime = time.Now().Unix()
 }
 
 func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
@@ -333,332 +369,79 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 		},
 	}
 
-	// helpSetCOC := ".setcoc 0-5 // 设置常见的0-5房规\n" +
-	// 	".setcoc dg // delta green 扩展规则"
-	// cmdSetCOC := &types.CmdItemInfo{
-	// 	Name:      "setcoc",
-	// 	ShortHelp: helpSetCOC,
-	// 	Help:      "设置房规:\n" + helpSetCOC,
-	// 	HelpFunc: func(isShort bool) string {
-	// 		help := ".setcoc 0-5 // 设置常见的0-5房规，0为规则书，2为国内常用规则\n" +
-	// 			".setcoc dg // delta green 扩展规则\n" +
-	// 			".setcoc details // 列出所有规则及其解释文本 \n"
+	helpSetCOC := ".setcoc 0-5 // 设置常见的0-5房规\n" +
+		".setcoc dg // delta green 扩展规则"
+	cmdSetCOC := &types.CmdItemInfo{
+		Name:      "setcoc",
+		ShortHelp: helpSetCOC,
+		Help:      "设置房规:\n" + helpSetCOC,
+		HelpFunc: func(isShort bool) string {
+			help := ".setcoc 0-5 // 设置常见的0-5房规，0为规则书，2为国内常用规则\n" +
+				".setcoc dg // delta green 扩展规则\n" +
+				".setcoc details // 列出所有规则及其解释文本 \n"
 
-	// 		// 自定义
-	// 		for _, i := range self.CocExtraRules {
-	// 			n := strings.ReplaceAll(i.Desc, "\n", " ")
-	// 			help += fmt.Sprintf(".setcoc %d/%s // %s\n", i.Index, i.Key, n)
-	// 		}
+			if isShort {
+				return help
+			}
+			return "设置房规:\n" + help
+		},
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			nRaw := cmdArgs.GetArgN(1)
+			n := strings.ToLower(nRaw)
+			if n == "help" || n == "" {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
 
-	// 		if isShort {
-	// 			return help
-	// 		}
-	// 		return "设置房规:\n" + help
-	// 	},
-	// 	Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-	// 		n := cmdArgs.GetArgN(1)
-	// 		suffix := "\nCOC7规则扩展已自动开启"
-	// 		setRuleByName(ctx, "coc7")
+			suffix := "\nCOC7规则扩展已自动开启"
+			setRuleByName(ctx, "coc7")
 
-	// 		switch n {
-	// 		case "0":
-	// 			ctx.Group.CocRuleIndex = 0
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "1":
-	// 			ctx.Group.CocRuleIndex = 1
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "2":
-	// 			ctx.Group.CocRuleIndex = 2
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "3":
-	// 			ctx.Group.CocRuleIndex = 3
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "4":
-	// 			ctx.Group.CocRuleIndex = 4
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "5":
-	// 			ctx.Group.CocRuleIndex = 5
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "dg":
-	// 			ctx.Group.CocRuleIndex = 11
-	// 			text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[ctx.Group.CocRuleIndex], SetCocRuleText[ctx.Group.CocRuleIndex], suffix)
-	// 			ReplyToSender(ctx, msg, text)
-	// 		case "details":
-	// 			help := "当前有coc7规则如下:\n"
-	// 			for i := range 6 {
-	// 				basicStr := strings.ReplaceAll(SetCocRuleText[i], "\n", " ")
-	// 				help += fmt.Sprintf(".setcoc %d // %s\n", i, basicStr)
-	// 			}
-	// 			// dg
-	// 			dgStr := strings.ReplaceAll(SetCocRuleText[11], "\n", " ")
-	// 			help += fmt.Sprintf(".setcoc dg // %s\n", dgStr)
+			sendRule := func(index int) {
+				ctx.Group.CocRuleIndex = index
+				text := fmt.Sprintf("已切换房规为%s:\n%s%s", SetCocRulePrefixText[index], SetCocRuleText[index], suffix)
+				ReplyToSender(ctx, msg, text)
+			}
 
-	// 			// 自定义
-	// 			for _, i := range self.CocExtraRules {
-	// 				ruleStr := strings.ReplaceAll(i.Desc, "\n", " ")
-	// 				help += fmt.Sprintf(".setcoc %d/%s // %s\n", i.Index, i.Key, ruleStr)
-	// 			}
-	// 			ReplyToSender(ctx, msg, help)
-	// 		case "help":
-	// 			return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-	// 		default:
-	// 			nInt, _ := strconv.ParseInt(n, 10, 64)
-	// 			for _, i := range ctx.Dice.CocExtraRules {
-	// 				if i.Key == n || nInt == int64(i.Index) {
-	// 					ctx.Group.CocRuleIndex = i.Index
-	// 					text := fmt.Sprintf("已切换房规为%s:\n%s%s", i.Name, i.Desc, suffix)
-	// 					ReplyToSender(ctx, msg, text)
-	// 					return types.CmdExecuteResult{Matched: true, Solved: true}
-	// 				}
-	// 			}
+			switch n {
+			case "0", "1", "2", "3", "4", "5":
+				idx, _ := strconv.Atoi(n)
+				sendRule(idx)
+			case "dg":
+				sendRule(11)
+			case "details":
+				help := "当前有coc7规则如下:\n"
+				for i := 0; i <= 5; i++ {
+					basicStr := strings.ReplaceAll(SetCocRuleText[i], "\n", " ")
+					help += fmt.Sprintf(".setcoc %d // %s\n", i, basicStr)
+				}
+				dgStr := strings.ReplaceAll(SetCocRuleText[11], "\n", " ")
+				help += fmt.Sprintf(".setcoc dg // %s\n", dgStr)
+				ReplyToSender(ctx, msg, help)
+			default:
+				if v, err := strconv.Atoi(n); err == nil {
+					if _, ok := SetCocRuleText[v]; ok {
+						sendRule(v)
+						break
+					}
+				}
 
-	// 			if text, ok := SetCocRuleText[ctx.Group.CocRuleIndex]; ok {
-	// 				VarSetValueStr(ctx, "$t房规文本", text)
-	// 				VarSetValueStr(ctx, "$t房规", SetCocRulePrefixText[ctx.Group.CocRuleIndex])
-	// 				VarSetValueInt64(ctx, "$t房规序号", int64(ctx.Group.CocRuleIndex))
-	// 				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:设置房规_当前"))
-	// 			} else {
-	// 				// TODO: 修改这种找规则的方式
-	// 				var rule *CocRuleInfo
-	// 				nInt64 := ctx.Group.CocRuleIndex
-	// 				for _, i := range ctx.Dice.CocExtraRules {
-	// 					if nInt64 == i.Index {
-	// 						rule = i
-	// 						break
-	// 					}
-	// 				}
+				if text, ok := SetCocRuleText[ctx.Group.CocRuleIndex]; ok {
+					VarSetValueStr(ctx, "$t房规文本", text)
+					VarSetValueStr(ctx, "$t房规", SetCocRulePrefixText[ctx.Group.CocRuleIndex])
+					VarSetValueInt64(ctx, "$t房规序号", int64(ctx.Group.CocRuleIndex))
+					ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:设置房规_当前"))
+				} else {
+					ReplyToSender(ctx, msg, "未找到对应房规")
+				}
+			}
 
-	// 				VarSetValueStr(ctx, "$t房规文本", rule.Desc)
-	// 				VarSetValueStr(ctx, "$t房规", rule.Name)
-	// 				VarSetValueInt64(ctx, "$t房规序号", int64(rule.Index))
-	// 				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:设置房规_当前"))
-	// 			}
-	// 		}
-
-	// 		ctx.Group.ExtActive(ctx.Dice.ExtFind("coc7", false))
-	// 		ctx.Group.System = "coc7"
-	// 		ctx.Group.UpdatedAtTime = time.Now().Unix()
-	// 		return types.CmdExecuteResult{Matched: true, Solved: true}
-	// 	},
-	// }
-
-	// helpRcv := ".rav/.rcv <技能> @某人 // 自己和某人进行对抗检定\n" +
-	// 	".rav <技能1> <技能2> @某A @某B // 对A和B两人做对抗检定，分别使用输入的两个技能数值\n" +
-	// 	"// 注: <技能>写法举例: 侦查、侦查40、困难侦查、40、侦查+10"
-	// cmdRcv := &types.CmdItemInfo{
-	// 	Name:          "rcv/rav",
-	// 	ShortHelp:     helpRcv,
-	// 	Help:          "对抗检定:\n" + helpRcv,
-	// 	AllowDelegate: true, // 特殊的代骰
-	// 	Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-	// 		val := cmdArgs.GetArgN(1)
-	// 		ctx.DelegateText = "" // 消除代骰文本，避免单人代骰出问题
-
-	// 		switch val {
-	// 		case "help", "":
-	// 			return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-	// 		default:
-	// 			// 至少@一人，检定才成立
-	// 			if len(cmdArgs.At) == 0 {
-	// 				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-	// 			}
-	// 			ctx1 := ctx
-	// 			ctx2 := ctx
-
-	// 			if cmdArgs.AmIBeMentionedFirst {
-	// 				// 第一个at的是骰子，不计为 at的人
-	// 				if len(cmdArgs.At) == 2 {
-	// 					// 单人
-	// 					ctx2, _ = cmdArgs.At[1].CopyCtx(ctx)
-	// 				} else if len(cmdArgs.At) == 3 {
-	// 					ctx1, _ = cmdArgs.At[1].CopyCtx(ctx)
-	// 					ctx2, _ = cmdArgs.At[2].CopyCtx(ctx)
-	// 				}
-	// 			} else {
-	// 				if len(cmdArgs.At) == 1 {
-	// 					// 单人
-	// 					ctx2, _ = cmdArgs.At[0].CopyCtx(ctx)
-	// 				} else if len(cmdArgs.At) == 2 {
-	// 					ctx1, _ = cmdArgs.At[0].CopyCtx(ctx)
-	// 					ctx2, _ = cmdArgs.At[1].CopyCtx(ctx)
-	// 				}
-	// 			}
-
-	// 			restText := cmdArgs.CleanArgs
-	// 			var lastMatched string
-	// 			readOneVal := func(mctx *MsgContext) (*types.CmdExecuteResult, int64, string, string) {
-	// 				r, _, err := DiceExprEvalBase(mctx, restText, RollExtraFlags{
-	// 					CocVarNumberMode: true,
-	// 					CocDefaultAttrOn: true,
-	// 					DisableBlock:     true,
-	// 				})
-
-	// 				if err != nil {
-	// 					ReplyToSender(ctx, msg, "解析出错: "+restText)
-	// 					return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, "", ""
-	// 				}
-	// 				val, ok := r.ReadInt()
-	// 				if !ok {
-	// 					ReplyToSender(ctx, msg, "类型不是数字: "+r.GetMatched())
-	// 					return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, "", ""
-	// 				}
-	// 				lastMatched = r.GetMatched()
-	// 				restText = r.GetRestInput()
-	// 				return nil, int64(val), r.GetCocPrefix(), r.GetMatched()
-	// 			}
-
-	// 			readOneOutcomeVal := func(mctx *MsgContext) (*types.CmdExecuteResult, int64, string) {
-	// 				restText = strings.TrimSpace(restText)
-	// 				if strings.HasPrefix(restText, ",") || strings.HasPrefix(restText, "，") {
-	// 					re := regexp.MustCompile(`[,，](.*)`)
-	// 					m := re.FindStringSubmatch(restText)
-	// 					restText = m[1]
-	// 					r, detail, err := DiceExprEvalBase(mctx, restText, RollExtraFlags{DisableBlock: true})
-	// 					if err != nil {
-	// 						ReplyToSender(ctx, msg, "解析出错: "+restText)
-	// 						return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, ""
-	// 					}
-	// 					val, ok := r.ReadInt()
-	// 					if !ok {
-	// 						ReplyToSender(ctx, msg, "类型不是数字: "+r.GetMatched())
-	// 						return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, ""
-	// 					}
-	// 					restText = r.GetRestInput()
-	// 					return nil, int64(val), "[" + detail + "]"
-	// 				}
-	// 				return nil, DiceRoll64(100), ""
-	// 			}
-
-	// 			ret, val1, difficult1, expr1 := readOneVal(ctx1)
-	// 			if ret != nil {
-	// 				return *ret
-	// 			}
-	// 			ret, outcome1, rollDetail1 := readOneOutcomeVal(ctx1)
-	// 			if ret != nil {
-	// 				return *ret
-	// 			}
-
-	// 			if restText == "" {
-	// 				restText = lastMatched
-	// 			}
-
-	// 			// lastMatched
-	// 			ret, val2, difficult2, expr2 := readOneVal(ctx2)
-	// 			if ret != nil {
-	// 				return *ret
-	// 			}
-	// 			ret, outcome2, rollDetail2 := readOneOutcomeVal(ctx2)
-	// 			if ret != nil {
-	// 				return *ret
-	// 			}
-
-	// 			cocRule := ctx.Group.CocRuleIndex
-	// 			if cmdArgs.Command == "rcv" {
-	// 				// 强制规则书
-	// 				cocRule = 0
-	// 			}
-
-	// 			successRank1, _ := ResultCheck(ctx, cocRule, outcome1, val1, 0)
-	// 			difficultyRequire1 := difficultyPrefixMap[difficult1]
-	// 			checkPass1 := successRank1 >= difficultyRequire1 // A是否通过检定
-
-	// 			successRank2, _ := ResultCheck(ctx, cocRule, outcome2, val2, 0)
-	// 			difficultyRequire2 := difficultyPrefixMap[difficult2]
-	// 			checkPass2 := successRank2 >= difficultyRequire2 // B是否通过检定
-
-	// 			winNum := 0
-	// 			switch {
-	// 			case checkPass1 && checkPass2:
-	// 				if successRank1 > successRank2 {
-	// 					// A 胜出
-	// 					winNum = -1
-	// 				} else if successRank1 < successRank2 {
-	// 					// B 胜出
-	// 					winNum = 1
-	// 				} else { //nolint:gocritic
-	// 					// 这里状况复杂，属性检定时，属性高的人胜出
-	// 					// 攻击时，成功等级相同，视为被攻击者胜出(目标选择闪避)
-	// 					// 攻击时，成功等级相同，视为攻击者胜出(目标选择反击)
-	// 					// 技能高的人胜出
-
-	// 					if cocRule == 11 {
-	// 						// dg规则下，似乎并不区分情况，比骰点大小即可
-	// 						if outcome1 < outcome2 {
-	// 							winNum = -1
-	// 						}
-	// 						if outcome1 > outcome2 {
-	// 							winNum = 1
-	// 						}
-	// 					} /* else {
-	// 						这段代码不能使用，因为如果是反击，那么技能是相同的，然而攻击方必胜
-	// 						reX := regexp.MustCompile("\\d+$")
-	// 						expr1X := reX.ReplaceAllString(expr1, "")
-	// 						expr2X := reX.ReplaceAllString(expr2, "")
-	// 						if expr1X != "" && expr1X == expr2X {
-	// 							if val1 > val2 {
-	// 								winNum = -1
-	// 							}
-	// 							if val1 < val2 {
-	// 								winNum = 1
-	// 							}
-	// 						}
-	// 					} */
-	// 				}
-	// 			case checkPass1 && !checkPass2:
-	// 				winNum = -1 // A胜
-	// 			case !checkPass1 && checkPass2:
-	// 				winNum = 1 // B胜
-	// 			default: /*no-op*/
-	// 			}
-
-	// 			suffix1 := GetResultTextWithRequire(ctx1, successRank1, difficultyRequire1, true)
-	// 			suffix2 := GetResultTextWithRequire(ctx2, successRank2, difficultyRequire2, true)
-
-	// 			p1Name := ctx1.Player.Name
-	// 			p2Name := ctx2.Player.Name
-	// 			if p1Name == "" {
-	// 				p1Name = "玩家A"
-	// 			}
-	// 			if p2Name == "" {
-	// 				p2Name = "玩家B"
-	// 			}
-
-	// 			VarSetValueStr(ctx, "$t玩家A", p1Name)
-	// 			VarSetValueStr(ctx, "$t玩家B", p2Name)
-
-	// 			VarSetValueStr(ctx, "$t玩家A判定式", expr1)
-	// 			VarSetValueStr(ctx, "$t玩家B判定式", expr2)
-
-	// 			VarSetValueInt64(ctx, "$t玩家A属性", val1) // 这个才是真正的判定值（判定线值，属性+难度影响）
-	// 			VarSetValueInt64(ctx, "$t玩家B属性", val2)
-
-	// 			VarSetValueInt64(ctx, "$t玩家A判定值", outcome1) // 这两个由下面的替换
-	// 			VarSetValueInt64(ctx, "$t玩家B判定值", outcome2) // 这两个由下面的替换
-	// 			VarSetValueInt64(ctx, "$t玩家A出目", outcome1)
-	// 			VarSetValueInt64(ctx, "$t玩家B出目", outcome2)
-
-	// 			VarSetValueStr(ctx, "$t玩家A判定过程", rollDetail1)
-	// 			VarSetValueStr(ctx, "$t玩家B判定过程", rollDetail2)
-
-	// 			VarSetValueStr(ctx, "$t玩家A判定结果", suffix1)
-	// 			VarSetValueStr(ctx, "$t玩家B判定结果", suffix2)
-
-	// 			VarSetValueInt64(ctx, "$tWinFlag", int64(winNum))
-
-	// 			ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:对抗检定"))
-	// 		}
-	// 		return types.CmdExecuteResult{Matched: true, Solved: true}
-	// 	},
-	// }
+			ctx.Group.ExtActive(ctx.Dice.ExtFind("coc7", false))
+			ctx.Group.System = "coc7"
+			ctx.Group.UpdatedAtTime = time.Now().Unix()
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
 
 	cmdSt := getCmdStBase(CmdStOverrideInfo{})
-
 	helpEn := `.en <技能名称>[<技能点数>] [+[<失败成长值>/]<成功成长值>] // 整体格式，可以直接看下面几个分解格式
 .en <技能名称> // 骰D100，若点数大于当前值，属性成长1d10
 .en <技能名称>[<技能点数>] // 骰D100，若点数大于技能点数，属性=技能点数+1d10
@@ -941,109 +724,296 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 		},
 	}
 
-	// cmdTi := &types.CmdItemInfo{
-	// 	Name:      "ti",
-	// 	ShortHelp: ".ti // 抽取一个临时性疯狂症状",
-	// 	Help:      "抽取临时性疯狂症状:\n.ti // 抽取一个临时性疯狂症状",
-	// 	Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-	// 		if cmdArgs.IsArgEqual(1, "help") {
-	// 			return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-	// 		}
-	// 		num := DiceRoll(10)
-	// 		VarSetValueStr(ctx, "$t表达式文本", fmt.Sprintf("1D10=%d", num))
-	// 		VarSetValueInt64(ctx, "$t选项值", int64(num))
+	helpRcv := ".rav/.rcv <技能> @某人 // 自己和某人进行对抗检定\n" +
+		".rav <技能1> <技能2> @某A @某B // 对A和B两人做对抗检定，分别使用输入的两个技能数值\n" +
+		"// 注: <技能>写法举例: 侦查、侦查40、困难侦查、40、侦查+10"
+	cmdRcv := &types.CmdItemInfo{
+		Name:          "rcv/rav",
+		ShortHelp:     helpRcv,
+		Help:          "对抗检定:\n" + helpRcv,
+		AllowDelegate: true, // 特殊的代骰
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			val := cmdArgs.GetArgN(1)
+			ctx.DelegateText = "" // 消除代骰文本，避免单人代骰出问题
 
-	// 		var desc string
-	// 		extraNum1 := DiceRoll(10)
-	// 		VarSetValueInt64(ctx, "$t附加值1", int64(extraNum1))
-	// 		switch num {
-	// 		case 1:
-	// 			desc += fmt.Sprintf("失忆：调查员会发现自己只记得最后身处的安全地点，却没有任何来到这里的记忆。例如，调查员前一刻还在家中吃着早饭，下一刻就已经直面着不知名的怪物。这将会持续 1D10=%d 轮。", extraNum1)
-	// 		case 2:
-	// 			desc += fmt.Sprintf("假性残疾：调查员陷入了心理性的失明，失聪以及躯体缺失感中，持续 1D10=%d 轮。", extraNum1)
-	// 		case 3:
-	// 			desc += fmt.Sprintf("暴力倾向：调查员陷入了六亲不认的暴力行为中，对周围的敌人与友方进行着无差别的攻击，持续 1D10=%d 轮。", extraNum1)
-	// 		case 4:
-	// 			desc += fmt.Sprintf("偏执：调查员陷入了严重的偏执妄想之中。有人在暗中窥视着他们，同伴中有人背叛了他们，没有人可以信任，万事皆虚。持续 1D10=%d 轮", extraNum1)
-	// 		case 5:
-	// 			desc += fmt.Sprintf("人际依赖：守秘人适当参考调查员的背景中重要之人的条目，调查员因为一些原因而将他人误认为了他重要的人并且努力的会与那个人保持那种关系，持续 1D10=%d 轮", extraNum1)
-	// 		case 6:
-	// 			desc += fmt.Sprintf("昏厥：调查员当场昏倒，并需要 1D10=%d 轮才能苏醒。", extraNum1)
-	// 		case 7:
-	// 			desc += fmt.Sprintf("逃避行为：调查员会用任何的手段试图逃离现在所处的位置，即使这意味着开走唯一一辆交通工具并将其它人抛诸脑后，调查员会试图逃离 1D10=%d 轮。", extraNum1)
-	// 		case 8:
-	// 			desc += fmt.Sprintf("歇斯底里：调查员表现出大笑，哭泣，嘶吼，害怕等的极端情绪表现，持续 1D10=%d 轮。", extraNum1)
-	// 		case 9:
-	// 			desc += fmt.Sprintf("恐惧：调查员通过一次 D100 或者由守秘人选择，来从恐惧症状表中选择一个恐惧源，就算这一恐惧的事物是并不存在的，调查员的症状会持续 1D10=%d 轮。", extraNum1)
-	// 			extraNum2 := DiceRoll(100)
-	// 			desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
-	// 			desc += fearMap[extraNum2]
-	// 			VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
-	// 		case 10:
-	// 			desc += fmt.Sprintf("躁狂：调查员通过一次 D100 或者由守秘人选择，来从躁狂症状表中选择一个躁狂的诱因，这个症状将会持续 1D10=%d 轮。", extraNum1)
-	// 			extraNum2 := DiceRoll(100)
-	// 			desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
-	// 			desc += maniaMap[extraNum2]
-	// 			VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
-	// 		}
-	// 		VarSetValueStr(ctx, "$t疯狂描述", desc)
+			switch val {
+			case "help", "":
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			default:
+				if len(cmdArgs.At) == 0 {
+					return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+				}
 
-	// 		ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:疯狂发作_即时症状"))
-	// 		return types.CmdExecuteResult{Matched: true, Solved: true}
-	// 	},
-	// }
+				ctx1 := ctx
+				ctx2 := ctx
 
-	// cmdLi := &types.CmdItemInfo{
-	// 	Name:      "li",
-	// 	ShortHelp: ".li // 抽取一个总结性疯狂症状",
-	// 	Help:      "抽取总结性疯狂症状:\n.li // 抽取一个总结性疯狂症状",
-	// 	Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
-	// 		if cmdArgs.IsArgEqual(1, "help") {
-	// 			return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
-	// 		}
-	// 		num := DiceRoll(10)
-	// 		VarSetValueStr(ctx, "$t表达式文本", fmt.Sprintf("1D10=%d", num))
-	// 		VarSetValueInt64(ctx, "$t选项值", int64(num))
+				getProxyCtx := func(pos int) *types.MsgContext {
+					mctx := GetCtxProxyAtPos(ctx, cmdArgs, pos)
+					if mctx == nil {
+						return ctx
+					}
+					return mctx
+				}
 
-	// 		var desc string
-	// 		extraNum1 := DiceRoll(10)
-	// 		VarSetValueInt64(ctx, "$t附加值1", int64(extraNum1))
-	// 		switch num {
-	// 		case 1:
-	// 			desc += "失忆：回过神来，调查员们发现自己身处一个陌生的地方，并忘记了自己是谁。记忆会随时间恢复。"
-	// 		case 2:
-	// 			desc += fmt.Sprintf("被窃：调查员在 1D10=%d 小时后恢复清醒，发觉自己被盗，身体毫发无损。如果调查员携带着宝贵之物（见调查员背景），做幸运检定来决定其是否被盗。所有有价值的东西无需检定自动消失。", extraNum1)
-	// 		case 3:
-	// 			desc += fmt.Sprintf("遍体鳞伤：调查员在 1D10=%d 小时后恢复清醒，发现自己身上满是拳痕和瘀伤。生命值减少到疯狂前的一半，但这不会造成重伤。调查员没有被窃。这种伤害如何持续到现在由守秘人决定。", extraNum1)
-	// 		case 4:
-	// 			desc += "暴力倾向：调查员陷入强烈的暴力与破坏欲之中。调查员回过神来可能会理解自己做了什么也可能毫无印象。调查员对谁或何物施以暴力，他们是杀人还是仅仅造成了伤害，由守秘人决定。"
-	// 		case 5:
-	// 			desc += "极端信念：查看调查员背景中的思想信念，调查员会采取极端和疯狂的表现手段展示他们的思想信念之一。比如一个信教者会在地铁上高声布道。"
-	// 		case 6:
-	// 			desc += fmt.Sprintf("重要之人：考虑调查员背景中的重要之人，及其重要的原因。在 1D10=%d 小时或更久的时间中，调查员将不顾一切地接近那个人，并为他们之间的关系做出行动。", extraNum1)
-	// 		case 7:
-	// 			desc += "被收容：调查员在精神病院病房或警察局牢房中回过神来，他们可能会慢慢回想起导致自己被关在这里的事情。"
-	// 		case 8:
-	// 			desc += "逃避行为：调查员恢复清醒时发现自己在很远的地方，也许迷失在荒郊野岭，或是在驶向远方的列车或长途汽车上。"
-	// 		case 9:
-	// 			desc += fmt.Sprintf("恐惧：调查员患上一个新的恐惧症状。在恐惧症状表上骰 1 个 D100 来决定症状，或由守秘人选择一个。调查员在 1D10=%d 小时后回过神来，并开始为避开恐惧源而采取任何措施。", extraNum1)
-	// 			extraNum2 := DiceRoll(100)
-	// 			desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
-	// 			desc += fearMap[extraNum2]
-	// 			VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
-	// 		case 10:
-	// 			desc += fmt.Sprintf("狂躁：调查员患上一个新的狂躁症状。在狂躁症状表上骰 1 个 d100 来决定症状，或由守秘人选择一个。调查员会在 1D10=%d 小时后恢复理智。在这次疯狂发作中，调查员将完全沉浸于其新的狂躁症状。这症状是否会表现给旁人则取决于守秘人和此调查员。", extraNum1)
-	// 			extraNum2 := DiceRoll(100)
-	// 			desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
-	// 			desc += maniaMap[extraNum2]
-	// 			VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
-	// 		}
-	// 		VarSetValueStr(ctx, "$t疯狂描述", desc)
+				if cmdArgs.AmIBeMentionedFirst {
+					if len(cmdArgs.At) >= 2 {
+						ctx2 = getProxyCtx(1)
+					}
+					if len(cmdArgs.At) >= 3 {
+						ctx1 = getProxyCtx(1)
+						ctx2 = getProxyCtx(2)
+					}
+				} else {
+					if len(cmdArgs.At) >= 1 {
+						ctx2 = getProxyCtx(0)
+					}
+					if len(cmdArgs.At) >= 2 {
+						ctx1 = getProxyCtx(0)
+						ctx2 = getProxyCtx(1)
+					}
+				}
 
-	// 		ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:疯狂发作_总结症状"))
-	// 		return types.CmdExecuteResult{Matched: true, Solved: true}
-	// 	},
-	// }
+				restText := cmdArgs.CleanArgs
+				var lastMatched string
+				readOneVal := func(mctx *types.MsgContext) (*types.CmdExecuteResult, int64, string, string) {
+					r, _, err := DiceExprEvalBase(mctx, restText, RollExtraFlags{
+						CocVarNumberMode: true,
+						CocDefaultAttrOn: true,
+						DisableBlock:     true,
+					})
+
+					if err != nil {
+						ReplyToSender(ctx, msg, "解析出错: "+restText)
+						return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, "", ""
+					}
+					val, ok := r.ReadInt()
+					if !ok {
+						ReplyToSender(ctx, msg, "类型不是数字: "+r.GetMatched())
+						return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, "", ""
+					}
+					lastMatched = r.GetMatched()
+					restText = r.GetRestInput()
+					return nil, int64(val), r.GetCocPrefix(), r.GetMatched()
+				}
+
+				readOneOutcomeVal := func(mctx *types.MsgContext) (*types.CmdExecuteResult, int64, string) {
+					restText = strings.TrimSpace(restText)
+					if strings.HasPrefix(restText, ",") || strings.HasPrefix(restText, "，") {
+						re := regexp.MustCompile(`[,，](.*)`)
+						m := re.FindStringSubmatch(restText)
+						restText = m[1]
+						r, detail, err := DiceExprEvalBase(mctx, restText, RollExtraFlags{DisableBlock: true})
+						if err != nil {
+							ReplyToSender(ctx, msg, "解析出错: "+restText)
+							return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, ""
+						}
+						val, ok := r.ReadInt()
+						if !ok {
+							ReplyToSender(ctx, msg, "类型不是数字: "+r.GetMatched())
+							return &types.CmdExecuteResult{Matched: true, Solved: true}, 0, ""
+						}
+						restText = r.GetRestInput()
+						return nil, int64(val), "[" + detail + "]"
+					}
+					return nil, DiceRoll64(100), ""
+				}
+
+				ret, val1, difficult1, expr1 := readOneVal(ctx1)
+				if ret != nil {
+					return *ret
+				}
+				ret, outcome1, rollDetail1 := readOneOutcomeVal(ctx1)
+				if ret != nil {
+					return *ret
+				}
+
+				if restText == "" {
+					restText = lastMatched
+				}
+
+				ret, val2, difficult2, expr2 := readOneVal(ctx2)
+				if ret != nil {
+					return *ret
+				}
+				ret, outcome2, rollDetail2 := readOneOutcomeVal(ctx2)
+				if ret != nil {
+					return *ret
+				}
+
+				cocRule := ctx.Group.CocRuleIndex
+				if cmdArgs.Command == "rcv" {
+					cocRule = 0
+				}
+
+				successRank1, _ := ResultCheck(ctx, cocRule, outcome1, val1, 0)
+				difficultyRequire1 := difficultyPrefixMap[difficult1]
+				checkPass1 := successRank1 >= difficultyRequire1
+
+				successRank2, _ := ResultCheck(ctx, cocRule, outcome2, val2, 0)
+				difficultyRequire2 := difficultyPrefixMap[difficult2]
+				checkPass2 := successRank2 >= difficultyRequire2
+
+				winNum := 0
+				switch {
+				case checkPass1 && checkPass2:
+					if successRank1 > successRank2 {
+						winNum = -1
+					} else if successRank1 < successRank2 {
+						winNum = 1
+					} else {
+						if cocRule == 11 {
+							if outcome1 < outcome2 {
+								winNum = -1
+							}
+							if outcome1 > outcome2 {
+								winNum = 1
+							}
+						}
+					}
+				case checkPass1 && !checkPass2:
+					winNum = -1
+				case !checkPass1 && checkPass2:
+					winNum = 1
+				default:
+				}
+
+				suffix1 := GetResultTextWithRequire(ctx1, successRank1, difficultyRequire1, true)
+				suffix2 := GetResultTextWithRequire(ctx2, successRank2, difficultyRequire2, true)
+
+				p1Name := ctx1.Player.Name
+				p2Name := ctx2.Player.Name
+				if p1Name == "" {
+					p1Name = "玩家A"
+				}
+				if p2Name == "" {
+					p2Name = "玩家B"
+				}
+
+				VarSetValueStr(ctx, "$t玩家A", p1Name)
+				VarSetValueStr(ctx, "$t玩家B", p2Name)
+				VarSetValueStr(ctx, "$t玩家A判定式", expr1)
+				VarSetValueStr(ctx, "$t玩家B判定式", expr2)
+				VarSetValueInt64(ctx, "$t玩家A属性", val1)
+				VarSetValueInt64(ctx, "$t玩家B属性", val2)
+				VarSetValueInt64(ctx, "$t玩家A判定值", outcome1)
+				VarSetValueInt64(ctx, "$t玩家B判定值", outcome2)
+				VarSetValueInt64(ctx, "$t玩家A出目", outcome1)
+				VarSetValueInt64(ctx, "$t玩家B出目", outcome2)
+				VarSetValueStr(ctx, "$t玩家A掷骰详情", rollDetail1)
+				VarSetValueStr(ctx, "$t玩家B掷骰详情", rollDetail2)
+				VarSetValueStr(ctx, "$t玩家A结果", suffix1)
+				VarSetValueStr(ctx, "$t玩家B结果", suffix2)
+				VarSetValueInt64(ctx, "$tWinFlag", int64(winNum))
+
+				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:对抗检定"))
+			}
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	cmdTi := &types.CmdItemInfo{
+		Name:      "ti",
+		ShortHelp: ".ti // 抽取一个临时性疯狂症状",
+		Help:      "抽取临时性疯狂症状:\n.ti // 抽取一个临时性疯狂症状",
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			num := int(DiceRoll64(10))
+			VarSetValueStr(ctx, "$t表达式文本", fmt.Sprintf("1D10=%d", num))
+			VarSetValueInt64(ctx, "$t选项值", int64(num))
+
+			var desc string
+			extraNum1 := int(DiceRoll64(10))
+			VarSetValueInt64(ctx, "$t附加值1", int64(extraNum1))
+			switch num {
+			case 1:
+				desc += fmt.Sprintf("失忆：调查员会发现自己只记得最后身处的安全地点，却没有任何来到这里的记忆。例如，调查员前一刻还在家中吃着早饭，下一刻就已经直面着不知名的怪物。这将会持续 1D10=%d 轮。", extraNum1)
+			case 2:
+				desc += fmt.Sprintf("假性残疾：调查员陷入了心理性的失明，失聪以及躯体缺失感中，持续 1D10=%d 轮。", extraNum1)
+			case 3:
+				desc += fmt.Sprintf("暴力倾向：调查员陷入了六亲不认的暴力行为中，对周围的敌人与友方进行着无差别的攻击，持续 1D10=%d 轮。", extraNum1)
+			case 4:
+				desc += fmt.Sprintf("偏执：调查员陷入了严重的偏执妄想之中。有人在暗中窥视着他们，同伴中有人背叛了他们，没有人可以信任，万事皆虚。持续 1D10=%d 轮", extraNum1)
+			case 5:
+				desc += fmt.Sprintf("人际依赖：守秘人适当参考调查员的背景中重要之人的条目，调查员因为一些原因而将他人误认为了他重要的人并且努力的会与那个人保持那种关系，持续 1D10=%d 轮", extraNum1)
+			case 6:
+				desc += fmt.Sprintf("昏厥：调查员当场昏倒，并需要 1D10=%d 轮才能苏醒。", extraNum1)
+			case 7:
+				desc += fmt.Sprintf("逃避行为：调查员会用任何的手段试图逃离现在所处的位置，即使这意味着开走唯一一辆交通工具并将其它人抛诸脑后，调查员会试图逃离 1D10=%d 轮。", extraNum1)
+			case 8:
+				desc += fmt.Sprintf("歇斯底里：调查员表现出大笑，哭泣，嘶吼，害怕等的极端情绪表现，持续 1D10=%d 轮。", extraNum1)
+			case 9:
+				desc += fmt.Sprintf("恐惧：调查员通过一次 D100 或者由守秘人选择，来从恐惧症状表中选择一个恐惧源，就算这一恐惧的事物是并不存在的，调查员的症状会持续 1D10=%d 轮。", extraNum1)
+				extraNum2 := int(DiceRoll64(100))
+				desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
+				desc += fearMap[extraNum2]
+				VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
+			case 10:
+				desc += fmt.Sprintf("躁狂：调查员通过一次 D100 或者由守秘人选择，来从躁狂症状表中选择一个躁狂的诱因，这个症状将会持续 1D10=%d 轮。", extraNum1)
+				extraNum2 := int(DiceRoll64(100))
+				desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
+				desc += maniaMap[extraNum2]
+				VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
+			}
+			VarSetValueStr(ctx, "$t疯狂描述", desc)
+
+			ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:疯狂发作_即时症状"))
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
+
+	cmdLi := &types.CmdItemInfo{
+		Name:      "li",
+		ShortHelp: ".li // 抽取一个总结性疯狂症状",
+		Help:      "抽取总结性疯狂症状:\n.li // 抽取一个总结性疯狂症状",
+		Solve: func(ctx *types.MsgContext, msg *types.Message, cmdArgs *types.CmdArgs) types.CmdExecuteResult {
+			if cmdArgs.IsArgEqual(1, "help") {
+				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
+			}
+			num := int(DiceRoll64(10))
+			VarSetValueStr(ctx, "$t表达式文本", fmt.Sprintf("1D10=%d", num))
+			VarSetValueInt64(ctx, "$t选项值", int64(num))
+
+			var desc string
+			extraNum1 := int(DiceRoll64(10))
+			VarSetValueInt64(ctx, "$t附加值1", int64(extraNum1))
+			switch num {
+			case 1:
+				desc += "失忆：回过神来，调查员们发现自己身处一个陌生的地方，并忘记了自己是谁。记忆会随时间恢复。"
+			case 2:
+				desc += fmt.Sprintf("被窃：调查员在 1D10=%d 小时后恢复清醒，发觉自己被盗，身体毫发无损。如果调查员携带着宝贵之物（见调查员背景），做幸运检定来决定其是否被盗。所有有价值的东西无需检定自动消失。", extraNum1)
+			case 3:
+				desc += fmt.Sprintf("遍体鳞伤：调查员在 1D10=%d 小时后恢复清醒，发现自己身上满是拳痕和瘀伤。生命值减少到疯狂前的一半，但这不会造成重伤。调查员没有被窃。这种伤害如何持续到现在由守秘人决定。", extraNum1)
+			case 4:
+				desc += "暴力倾向：调查员陷入强烈的暴力与破坏欲之中。调查员回过神来可能会理解自己做了什么也可能毫无印象。调查员对谁或何物施以暴力，他们是杀人还是仅仅造成了伤害，由守秘人决定。"
+			case 5:
+				desc += "极端信念：查看调查员背景中的思想信念，调查员会采取极端和疯狂的表现手段展示他们的思想信念之一。比如一个信教者会在地铁上高声布道。"
+			case 6:
+				desc += fmt.Sprintf("重要之人：考虑调查员背景中的重要之人，及其重要的原因。在 1D10=%d 小时或更久的时间中，调查员将不顾一切地接近那个人，并为他们之间的关系做出行动。", extraNum1)
+			case 7:
+				desc += "被收容：调查员在精神病院病房或警察局牢房中回过神来，他们可能会慢慢回想起导致自己被关在这里的事情。"
+			case 8:
+				desc += "逃避行为：调查员恢复清醒时发现自己在很远的地方，也许迷失在荒郊野岭，或是在驶向远方的列车或长途汽车上。"
+			case 9:
+				desc += fmt.Sprintf("恐惧：调查员患上一个新的恐惧症状。在恐惧症状表上骰 1 个 D100 来决定症状，或由守秘人选择一个。调查员在 1D10=%d 小时后回过神来，并开始为避开恐惧源而采取任何措施。", extraNum1)
+				extraNum2 := int(DiceRoll64(100))
+				desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
+				desc += fearMap[extraNum2]
+				VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
+			case 10:
+				desc += fmt.Sprintf("狂躁：调查员患上一个新的狂躁症状。在狂躁症状表上骰 1 个 d100 来决定症状，或由守秘人选择一个。调查员会在 1D10=%d 小时后恢复理智。在这次疯狂发作中，调查员将完全沉浸于其新的狂躁症状。这症状是否会表现给旁人则取决于守秘人和此调查员。", extraNum1)
+				extraNum2 := int(DiceRoll64(100))
+				desc += fmt.Sprintf("\n1D100=%d\n", extraNum2)
+				desc += maniaMap[extraNum2]
+				VarSetValueInt64(ctx, "$t附加值2", int64(extraNum2))
+			}
+			VarSetValueStr(ctx, "$t疯狂描述", desc)
+
+			ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "COC:疯狂发作_总结症状"))
+			return types.CmdExecuteResult{Matched: true, Solved: true}
+		},
+	}
 
 	helpSc := ".sc <成功时掉san>/<失败时掉san> // 对理智进行一次D100检定，根据结果扣除理智\n" +
 		".sc <失败时掉san> //同上，简易写法 \n" +
@@ -1349,24 +1319,19 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 		},
 		// GetDescText: GetExtensionDesc,
 		CmdMap: types.CmdMapCls{
-			"en": cmdEn,
-			// "setcoc": cmdSetCOC,
-			// "ti":     cmdTi,
-			// "li":     cmdLi,
-			"ra":   cmdRc,
-			"rc":   cmdRc,
-			"rch":  cmdRc,
-			"rah":  cmdRc,
-			"cra":  cmdRc,
-			"crc":  cmdRc,
-			"crch": cmdRc,
-			"crah": cmdRc,
-			// "rav":    cmdRcv,
-			// "rcv":    cmdRcv,
-			"sc":  cmdSc,
-			"coc": cmdCoc,
-			"st":  cmdSt,
-			"cst": cmdSt,
+			"en":     cmdEn,
+			"setcoc": cmdSetCOC,
+			"ti":     cmdTi,
+			"li":     cmdLi,
+			"ra":     cmdRc,
+			"rc":     cmdRc,
+			"rch":    cmdRc,
+			"rah":    cmdRc,
+			"rav":    cmdRcv,
+			"rcv":    cmdRcv,
+			"sc":     cmdSc,
+			"coc":    cmdCoc,
+			"st":     cmdSt,
 		},
 	}
 	theDice.RegisterExtension(theExt)

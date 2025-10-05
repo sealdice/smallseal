@@ -630,6 +630,12 @@ func getCmdStBase(soi CmdStOverrideInfo) *types.CmdItemInfo {
 				ReplyToSender(mctx, msg, DiceFormatTmpl(mctx, "COC:属性设置_删除"))
 			case "clr", "clear":
 				num := attrs.Clear()
+				for _, keyVal := range attrs.ToArrayKeys() {
+					key := keyVal.ToString()
+					if strings.HasPrefix(key, "常量:") {
+						attrs.Delete(key)
+					}
+				}
 				attrs.SetSheetType("")
 				VarSetValueInt64(mctx, "$t数量", int64(num))
 				ReplyToSender(mctx, msg, DiceFormatTmpl(mctx, "COC:属性设置_清除"))
