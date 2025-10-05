@@ -520,17 +520,16 @@ func getCmdStBase(soi CmdStOverrideInfo) *types.CmdItemInfo {
 				}
 			}
 
-			// 等下，为啥要执行两遍，旧代码也是这样？而且没检查错误
-			// mctx.Eval(tmpl.PreloadCode, nil)
-			// if tmplShow != tmpl {
-			// 	mctx.Eval(tmplShow.PreloadCode, nil)
-			// }
-			// if tmpl.InitScript != "" {
-			// 	if mctx.GetVM().Error != nil {
-			// 		ReplyToSender(mctx, msg, "属性设置指令执行失败："+mctx.GetVM().Error.Error())
-			// 		return types.CmdExecuteResult{Matched: true, Solved: true}
-			// 	}
-			// }
+			if tmplShow != tmpl {
+				// 其他规则模板，需要执行对应模板的InitScript
+				if tmplShow.InitScript != "" {
+					mctx.Eval(tmplShow.InitScript, nil)
+					if mctx.GetVM().Error != nil {
+						ReplyToSender(mctx, msg, "加载规则模板"+tmplShow.Name+"失败："+mctx.GetVM().Error.Error())
+						return types.CmdExecuteResult{Matched: true, Solved: true}
+					}
+				}
+			}
 
 			if soi.CommandSolve != nil {
 				ret := soi.CommandSolve(ctx, msg, cmdArgs)
@@ -640,7 +639,7 @@ func getCmdStBase(soi CmdStOverrideInfo) *types.CmdItemInfo {
 			default:
 				if cardType != "" && cardType != mctx.Group.System {
 					ReplyToSender(mctx, msg, fmt.Sprintf("阻止操作：当前卡规则为 %s，群规则为 %s。\n为避免损坏此人物卡，请先更换角色卡，或使用.st fmt强制转卡", cardType, mctx.Group.System))
-					return types.CmdExecuteResult{Matched: true, Solved: true}
+					return CmdExecuteResult{Matched: true, Solved: true}
 				}
 
 				cmdStCharFormat(mctx, tmpl) // 转一下卡

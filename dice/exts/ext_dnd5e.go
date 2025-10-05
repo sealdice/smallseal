@@ -16,18 +16,6 @@ import (
 	"github.com/sealdice/smallseal/dice/types"
 )
 
-type (
-	MsgContext         = types.MsgContext
-	Message            = types.Message
-	CmdArgs            = types.CmdArgs
-	CmdExecuteResult   = types.CmdExecuteResult
-	ExtInfo            = types.ExtInfo
-	CmdItemInfo        = types.CmdItemInfo
-	CmdMapCls          = types.CmdMapCls
-	GameSystemTemplate = types.GameSystemTemplateV2
-	AttributesItem     = attrs.AttributesItem
-)
-
 type Int64SliceDesc []int64
 
 func (p Int64SliceDesc) Len() int           { return len(p) }

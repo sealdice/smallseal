@@ -7,8 +7,21 @@ import (
 	"github.com/samber/lo"
 	ds "github.com/sealdice/dicescript"
 
+	"github.com/sealdice/smallseal/dice/attrs"
 	"github.com/sealdice/smallseal/dice/types"
 	"github.com/sealdice/smallseal/utils"
+)
+
+type (
+	MsgContext         = types.MsgContext
+	Message            = types.Message
+	CmdArgs            = types.CmdArgs
+	CmdExecuteResult   = types.CmdExecuteResult
+	ExtInfo            = types.ExtInfo
+	CmdItemInfo        = types.CmdItemInfo
+	CmdMapCls          = types.CmdMapCls
+	GameSystemTemplate = types.GameSystemTemplateV2
+	AttributesItem     = attrs.AttributesItem
 )
 
 // SetCardType 这几个先不动，后面改名字或者移除
