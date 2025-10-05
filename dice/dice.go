@@ -125,8 +125,11 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 		}
 		groupInfo.Players.Store(msg.Sender.UserID, player)
 	} else if msg.Sender.Nickname != "" {
-		player.Name = msg.Sender.Nickname
+		if player.Name == "" {
+			player.Name = msg.Sender.Nickname
+		}
 	}
+
 	player.InGroup = msg.MessageType == "group"
 	mctx.Player = player
 
