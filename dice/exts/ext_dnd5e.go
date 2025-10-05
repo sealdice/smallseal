@@ -95,12 +95,6 @@ func AtBuild(uid string) string {
 	return uid
 }
 
-func setDndReadForVM(ctx *MsgContext, readMod bool) {
-	// TODO: Implement DnD-specific value load behaviour once VM hooks are available.
-	_ = ctx
-	_ = readMod
-}
-
 func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 	deathSavingStable := func(ctx *MsgContext) {
 		VarDelValue(ctx, "DSS")

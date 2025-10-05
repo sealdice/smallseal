@@ -83,9 +83,9 @@ func DiceExprEvalBase(ctx *types.MsgContext, s string, flags RollExtraFlags) (*V
 
 	var cocFlagVarPrefix string
 	if flags.CocVarNumberMode {
-		// ctx.setCocPrefixReadForVM(func(val string) {
-		// 	cocFlagVarPrefix = val
-		// })
+		setCocPrefixReadForVM(ctx, func(val string) {
+			cocFlagVarPrefix = val
+		})
 	}
 
 	s = CompatibleReplace(ctx, s)

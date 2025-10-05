@@ -129,29 +129,6 @@ func newVM(mctx *MsgContext) *ds.Context {
 	// 注册几个调试函数
 	RegisterDebugFuncs(vm)
 
-	// 取值hack
-	vm.Config.HookValueLoadPre = func(ctx *ds.Context, name string) (string, *ds.VMValue) {
-		re := regexp.MustCompile(`^(困难|极难|大成功|常规|失败|困難|極難|常規|失敗)?([^\d]+)(\d+)?$`)
-		m := re.FindStringSubmatch(name)
-		// var cocFlagVarPrefix string
-
-		if len(m) > 0 {
-			// if m[1] != "" {
-			// 	cocFlagVarPrefix = m[1]
-			// 	name = name[len(m[1]):]
-			// }
-
-			// 有末值时覆盖，有初值时
-			// if m[3] != "" {
-			// 	v, _ := strconv.ParseInt(m[3], 10, 64)
-			// 	fmt.Println("COC值:", name, cocFlagVarPrefix)
-			// 	return name, ds.NewIntVal(ds.IntType(v))
-			// }
-		}
-
-		return name, nil
-	}
-
 	// 取值后hack
 	vm.Config.HookValueLoadPost = func(ctx *ds.Context, name string, curVal *ds.VMValue, doCompute func(curVal *ds.VMValue) *ds.VMValue, detail *ds.BufferSpan) *ds.VMValue {
 		if gameSystem.HookValueLoadPost != nil {

@@ -5,6 +5,7 @@ go 1.24.6
 require (
 	github.com/Szzrain/Milky-go-sdk v0.3.9
 	github.com/gorilla/websocket v1.5.3
+	github.com/lascape/sat v1.0.4
 	github.com/peterh/liner v1.2.2
 	github.com/samber/lo v1.51.0
 	github.com/sealdice/dicescript v0.0.0-20250903023101-e8c6e09caab2
