@@ -47,7 +47,7 @@ func NewDice() *Dice {
 	}
 
 	d.attrsManager.Init()
-	d.Config.CommandPrefix = []string{"."}
+	d.Config.CommandPrefix = []string{".", "。"}
 
 	for _, tmplPath := range []string{
 		"./coc7.yaml",
@@ -265,8 +265,26 @@ func (d *Dice) SendReply(msg *types.MsgToReply) {
 	})
 }
 
+func (d *Dice) PersistGroupInfo(groupID string, info *types.GroupInfo) {
+	if d == nil || d.GroupInfoManager == nil {
+		return
+	}
+	if groupID == "" || info == nil {
+		return
+	}
+	d.GroupInfoManager.Store(groupID, info)
+}
+
 func (d *Dice) AttrsSetIO(io attrs.AttrsIO) {
 	d.attrsManager.SetIO(io)
+}
+
+// SaveAll 手动保存所有未保存的属性数据
+func (d *Dice) SaveAll() error {
+	if d.attrsManager == nil {
+		return fmt.Errorf("属性管理器未初始化")
+	}
+	return d.attrsManager.CheckForSave()
 }
 
 func (d *Dice) GameSystemMapLoad(name string) (*types.GameSystemTemplateV2, error) {

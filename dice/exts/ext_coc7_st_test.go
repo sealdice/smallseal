@@ -86,6 +86,8 @@ func (s *stubDice) ListMasters() []string { return nil }
 
 func (s *stubDice) IsMaster(string) bool { return false }
 
+func (s *stubDice) PersistGroupInfo(string, *types.GroupInfo) {}
+
 func minimalTextMap() types.TextTemplateWithWeightDict {
 	toItem := func(text string) types.TextTemplateItem {
 		return types.TextTemplateItem{text, 1}

@@ -117,3 +117,28 @@ func (i *AttributesItem) IsDataExists() bool {
 func (i *AttributesItem) GetValueMap() *ds.ValueMap {
 	return i.valueMap
 }
+
+// ToAttrsUpsertParams 获取批量保存模型
+func (i *AttributesItem) ToAttrsUpsertParams() (*AttrsUpsertParams, error) {
+	// 序列化数据
+	if i.valueMap == nil {
+		i.valueMap = &ds.ValueMap{}
+	}
+	jsonData, err := ds.NewDictVal(i.valueMap).V().ToJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	i.Data = jsonData
+	i.LastModifiedTime = time.Now().Unix()
+
+	return &AttrsUpsertParams{
+		Id:        i.ID,
+		Data:      i.Data,
+		Name:      i.Name,
+		SheetType: i.SheetType,
+		OwnerId:   i.OwnerId,
+		AttrsType: i.AttrsType,
+		IsHidden:  i.IsHidden,
+	}, nil
+}

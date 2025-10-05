@@ -489,6 +489,19 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 			if action == "" {
 				action = "about"
 			}
+			persistGroupState := func() {
+				if ctx.Dice == nil || ctx.Group == nil {
+					return
+				}
+				groupID := msg.GroupID
+				if groupID == "" {
+					groupID = ctx.Group.GroupId
+				}
+				if groupID == "" {
+					return
+				}
+				ctx.Dice.PersistGroupInfo(groupID, ctx.Group)
+			}
 			switch action {
 			case "on":
 				if ctx.IsPrivate || ctx.Group == nil {
@@ -497,6 +510,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				}
 				ctx.Group.Active = true
 				ctx.IsCurGroupBotOn = true
+				persistGroupState()
 				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子开启"))
 			case "off":
 				if ctx.IsPrivate || ctx.Group == nil {
@@ -505,6 +519,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				}
 				ctx.Group.Active = false
 				ctx.IsCurGroupBotOn = false
+				persistGroupState()
 				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:骰子关闭"))
 			case "bye", "quit", "exit":
 				if ctx.IsPrivate || ctx.Group == nil {

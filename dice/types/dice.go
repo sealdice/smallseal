@@ -14,6 +14,7 @@ type DiceLike interface {
 	ListMasters() []string
 	IsMaster(uid string) bool
 
+	PersistGroupInfo(groupID string, info *GroupInfo)
 	SendReply(msg *MsgToReply)
 
 	RegisterMessageInHook(name string, priority HookPriority, hook MessageInHook) (HookHandle, error)

@@ -445,6 +445,21 @@ func cmdStCharFormat(mctx *types.MsgContext, tmpl *types.GameSystemTemplateV2) {
 	attrs.SetSheetType(mctx.Group.System)
 }
 
+func cardSystemCheck(mctx *types.MsgContext, msg *types.Message) *types.GameSystemTemplateV2 {
+	cardType := ReadCardType(mctx)
+	if cardType != "" && cardType != mctx.Group.System {
+		ReplyToSender(mctx, msg, fmt.Sprintf("阻止操作：当前卡规则为 %s，群规则为 %s。\n为避免损坏此人物卡，请先更换角色卡，或使用.st fmt强制转卡", cardType, mctx.Group.System))
+		return nil
+	}
+	tmpl := mctx.GetCharTemplate()
+	if tmpl == nil {
+		ReplyToSender(mctx, msg, fmt.Sprintf("阻止操作：未发现人物卡使用的规则: %s，可能相关扩展已经卸载，请联系骰主", cardType))
+		return nil
+	}
+	cmdStCharFormat(mctx, tmpl) // 转一下卡
+	return tmpl
+}
+
 type CmdStOverrideInfo struct {
 	ToSet        func(ctx *types.MsgContext, i *stSetOrModInfoItem, attrs *attrs.AttributesItem, tmpl *types.GameSystemTemplateV2) bool
 	ToMod        func(ctx *types.MsgContext, args *types.CmdArgs, i *stSetOrModInfoItem, attrs *attrs.AttributesItem, tmpl *types.GameSystemTemplateV2) bool

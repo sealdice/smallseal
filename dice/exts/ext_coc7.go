@@ -35,21 +35,6 @@ var difficultyPrefixMap = map[string]int{
 	"常規":  1,
 }
 
-func cardRuleCheck(mctx *types.MsgContext, msg *types.Message) *types.GameSystemTemplateV2 {
-	cardType := ReadCardType(mctx)
-	if cardType != "" && cardType != mctx.Group.System {
-		ReplyToSender(mctx, msg, fmt.Sprintf("阻止操作：当前卡规则为 %s，群规则为 %s。\n为避免损坏此人物卡，请先更换角色卡，或使用.st fmt强制转卡", cardType, mctx.Group.System))
-		return nil
-	}
-	tmpl := mctx.GetCharTemplate()
-	if tmpl == nil {
-		ReplyToSender(mctx, msg, fmt.Sprintf("阻止操作：未发现人物卡使用的规则: %s，可能相关扩展已经卸载，请联系骰主", cardType))
-		return nil
-	}
-	cmdStCharFormat(mctx, tmpl) // 转一下卡
-	return tmpl
-}
-
 func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 	// 初始化疯狂列表
 	reFear := regexp.MustCompile(`(\d+)\)\s+([^\n]+)`)
@@ -98,7 +83,7 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 			// mctx.SystemTemplate = mctx.GetCharTemplate()
 			restText := cmdArgs.CleanArgs
 
-			tmpl := cardRuleCheck(mctx, msg)
+			tmpl := cardSystemCheck(mctx, msg)
 			if tmpl == nil {
 				return types.CmdExecuteResult{Matched: true, Solved: true}
 			}
@@ -724,7 +709,7 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 			check := func(skill string) (checkResult enCheckResult) {
 				checkResult.valid = true
 				m := singleRe.FindStringSubmatch(skill)
-				tmpl := cardRuleCheck(mctx, msg)
+				tmpl := cardSystemCheck(mctx, msg)
 				if tmpl == nil {
 					checkResult.valid = false
 					checkResult.invalidReason = RuleNotMatch
@@ -1081,7 +1066,7 @@ func RegisterBuiltinExtCoc7(theDice types.DiceLike) {
 
 			mctx := GetCtxProxyFirst(ctx, cmdArgs)
 
-			tmpl := cardRuleCheck(mctx, msg)
+			tmpl := cardSystemCheck(mctx, msg)
 			if tmpl == nil {
 				return types.CmdExecuteResult{Matched: true, Solved: true}
 			}

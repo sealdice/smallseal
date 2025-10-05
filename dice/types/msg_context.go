@@ -182,7 +182,7 @@ func (ctx *MsgContext) GetDefaultDicePoints() string {
 		diceExpr = ctx.Group.DiceSideExpr
 	}
 	if diceExpr == "" {
-		diceExpr = "d100"
+		diceExpr = "100"
 	}
 	return diceExpr
 }

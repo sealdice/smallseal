@@ -233,6 +233,44 @@ func (am *AttrsManager) Init() {
 }
 
 func (am *AttrsManager) CheckForSave() error {
+	if am.io == nil {
+		// 尚未初始化
+		return errors.New("属性IO尚未初始化")
+	}
+
+	var resultList []*AttrsUpsertParams
+	prepareToSave := map[string]int{}
+
+	am.m.Range(func(key string, value *AttributesItem) bool {
+		if !value.IsSaved {
+			saveModel, err := value.ToAttrsUpsertParams()
+			if err != nil {
+				// 打印日志，但继续处理其他项目
+				// log.Errorf("定期写入用户数据出错(获取批量保存模型): %v", err)
+				return true
+			}
+			prepareToSave[key] = 1
+			resultList = append(resultList, saveModel)
+		}
+		return true
+	})
+
+	// 整体落盘
+	if len(resultList) == 0 {
+		return nil
+	}
+
+	if err := am.io.Puts(resultList); err != nil {
+		// log.Errorf("定期写入用户数据出错(批量保存): %v", err)
+		return err
+	}
+
+	for key := range prepareToSave {
+		// 理应不存在这个数据没有的情况
+		v, _ := am.m.Load(key)
+		v.IsSaved = true
+	}
+
 	return nil
 }
 
