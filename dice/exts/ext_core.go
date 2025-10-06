@@ -681,24 +681,24 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				return types.CmdExecuteResult{Matched: true, Solved: true, ShowHelp: true}
 			case "clr", "reset":
 				newName := msg.Sender.Nickname
-				VarSetValueStr(ctx, "旧昵称", fmt.Sprintf("<%s>", ctx.Player.Name))
-				VarSetValueStr(ctx, "旧昵称_RAW", ctx.Player.Name)
+				VarSetValueStr(ctx, "$t旧昵称", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "$t旧昵称_RAW", ctx.Player.Name)
 				ctx.Player.Name = newName
 				ctx.Player.UpdatedAtTime = time.Now().Unix()
-				VarSetValueStr(ctx, "玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
-				VarSetValueStr(ctx, "玩家_RAW", ctx.Player.Name)
+				VarSetValueStr(ctx, "$t玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "$t玩家_RAW", ctx.Player.Name)
 				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:昵称_重置"))
 			default:
 				clean := strings.TrimSpace(cmdArgs.CleanArgs)
 				if clean == "" {
 					clean = cmdArgs.GetArgN(1)
 				}
-				VarSetValueStr(ctx, "旧昵称", fmt.Sprintf("<%s>", ctx.Player.Name))
-				VarSetValueStr(ctx, "旧昵称_RAW", ctx.Player.Name)
+				VarSetValueStr(ctx, "$t旧昵称", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "$t旧昵称_RAW", ctx.Player.Name)
 				ctx.Player.Name = clean
 				ctx.Player.UpdatedAtTime = time.Now().Unix()
-				VarSetValueStr(ctx, "玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
-				VarSetValueStr(ctx, "玩家_RAW", ctx.Player.Name)
+				VarSetValueStr(ctx, "$t玩家", fmt.Sprintf("<%s>", ctx.Player.Name))
+				VarSetValueStr(ctx, "$t玩家_RAW", ctx.Player.Name)
 				ReplyToSender(ctx, msg, DiceFormatTmpl(ctx, "核心:昵称_改名"))
 			}
 			if ctx.Group != nil {
