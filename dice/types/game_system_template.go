@@ -223,19 +223,17 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 	var err error
 
 	// 先看一下是否有值
-	v, err0 := t.GetRealValueBase(ctx, k)
-	if err0 != nil {
-		return nil, err0
-	}
+	_, exists := t.GetAttrValue(ctx, k)
 
 	getVal := func(expr string) (*ds.VMValue, error) {
-		r, _, err = ctx.EvalFString(expr, &ds.RollConfig{
+		ctx.vm.Error = nil
+		r, _, err := ctx.EvalFString(expr, &ds.RollConfig{
 			DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
 		})
 		return r, err
 	}
 
-	if v == nil {
+	if !exists {
 		// 无值情况多一种匹配，用于虽然这个值有默认ShowValueAs，但是用户进行了赋值的情况
 		if expr, exists := t.Commands.St.Show.ShowValueAsIfMiss[k]; exists {
 			if r, err = getVal(expr); err == nil {
@@ -269,12 +267,15 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 		return ds.NewIntVal(0), err
 	}
 
-	// 返回真实值，如果真实值不存在就补0
-	if v == nil && err == nil {
-		// 不存在的值，强行补0
-		return ds.NewIntVal(0), nil
-	}
-	return v, err
+	// 最后返回真实值
+	return t.GetRealValue(ctx, k)
+}
+
+// 获取用户录入的值
+func (t *GameSystemTemplateV2) GetAttrValue(ctx *MsgContext, k string) (*ds.VMValue, bool) {
+	am := ctx.AttrsManager
+	curAttrs := lo.Must(am.Load(ctx.Group.GroupId, ctx.Player.UserId))
+	return curAttrs.Load(k)
 }
 
 func (t *GameSystemTemplateV2) GetRealValueBase(ctx *MsgContext, k string) (*ds.VMValue, error) {
