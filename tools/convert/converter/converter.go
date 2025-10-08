@@ -133,7 +133,7 @@ func Convert(src *TemplateV1, overrideTemplateVer string) *Output {
 	}
 
 	for k, v := range src.DetailOverwrite {
-		dst.Attrs.DetailOverwrite[k] = normalizeDetailOverwrite(v)
+		dst.Attrs.DetailOverwrite[k] = v
 	}
 
 	if len(dst.Attrs.Defaults) == 0 {
@@ -207,20 +207,6 @@ func MarshalOutput(template *Output, format string) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unsupported output format: %s", format)
 	}
-}
-
-func normalizeDetailOverwrite(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
-		return trimmed
-	}
-	if detailFuncExpr.MatchString(trimmed) {
-		return "{" + trimmed + "}"
-	}
-	return trimmed
 }
 
 func cloneStrings(src []string) []string {

@@ -348,6 +348,29 @@ func TestCoc7StShowComputedExpression(t *testing.T) {
 	require.Contains(t, reply, "手枪:&(1d3+1d5)")
 }
 
+func TestCoc7StShowDbKeepsExpression(t *testing.T) {
+	ctx, msg, stub := newCoc7TestContext(t)
+	cmd := getCmdStBase(CmdStOverrideInfo{})
+
+	executeStCommands(t, stub, ctx, msg, cmd, ".st力量90", ".st体型80")
+
+	_, reply := executeStCommand(t, stub, ctx, msg, ".st show db", cmd)
+	require.Contains(t, reply, "db")
+	require.Contains(t, reply, "1d6")
+}
+
+func TestCoc7StShowManualStrengthAndBuild(t *testing.T) {
+	ctx, msg, stub := newCoc7TestContext(t)
+	cmd := getCmdStBase(CmdStOverrideInfo{})
+
+	executeStCommands(t, stub, ctx, msg, cmd, ".st力量200", ".st体格=3", ".st db=5")
+
+	_, reply := executeStCommand(t, stub, ctx, msg, ".st show 力量 体格 db", cmd)
+	require.Contains(t, reply, "力量:200")
+	require.Contains(t, reply, "体格:3")
+	require.Contains(t, reply, "db:5")
+}
+
 func TestCoc7StShowAliasAndChinesePrefix(t *testing.T) {
 	ctx, msg, stub := newCoc7TestContext(t)
 	cmd := getCmdStBase(CmdStOverrideInfo{})

@@ -76,12 +76,13 @@ type StConfig struct {
 
 // StShowConfig st show配置
 type StShowConfig struct {
-	Top          []string          `yaml:"top"`          // 锁定在前面的几个
-	SortBy       string            `yaml:"sortBy"`       // 排序方式
-	Ignores      []string          `yaml:"ignores"`      // 忽略的属性
-	ShowValueAs  map[string]string `yaml:"showValueAs"`  // 影响单个属性的右侧内容
-	ShowKeyAs    map[string]string `yaml:"showKeyAs"`    // 影响单个属性的左侧内容
-	ItemsPerLine int               `yaml:"itemsPerLine"` // 每行显示多少个属性
+	Top               []string          `yaml:"top"`               // 锁定在前面的几个
+	SortBy            string            `yaml:"sortBy"`            // 排序方式
+	Ignores           []string          `yaml:"ignores"`           // 忽略的属性
+	ShowKeyAs         map[string]string `yaml:"showKeyAs"`         // 影响单个属性的左侧内容
+	ShowValueAs       map[string]string `yaml:"showValueAs"`       // 影响单个属性的右侧内容
+	ShowValueAsIfMiss map[string]string `yaml:"showValueAsIfMiss"` // 影响单个属性的右侧内容
+	ItemsPerLine      int               `yaml:"itemsPerLine"`      // 每行显示多少个属性
 }
 
 // LoadGameSystemTemplate 从YAML或JSON文件加载游戏系统模板
@@ -221,11 +222,39 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 	var r *ds.VMValue
 	var err error
 
-	if expr, exists := t.Commands.St.Show.ShowValueAs[k]; exists {
+	// 先看一下是否有值
+	v, err0 := t.GetRealValueBase(ctx, k)
+	if err0 != nil {
+		return nil, err0
+	}
+
+	getVal := func(expr string) (*ds.VMValue, error) {
 		r, _, err = ctx.EvalFString(expr, &ds.RollConfig{
 			DefaultDiceSideExpr: ctx.GetDefaultDicePoints(),
 		})
-		if err == nil {
+		return r, err
+	}
+
+	if v == nil {
+		// 无值情况多一种匹配，用于虽然这个值有默认ShowValueAs，但是用户进行了赋值的情况
+		if expr, exists := t.Commands.St.Show.ShowValueAsIfMiss[k]; exists {
+			if r, err = getVal(expr); err == nil {
+				return r, nil
+			}
+		}
+		// 通配值
+		if expr, exists := t.Commands.St.Show.ShowValueAsIfMiss["*"]; exists {
+			// 这里存入k是因为接下来模板可能会用到原始key，例如 loadRaw(name)
+			ctx.vm.StoreNameLocal("name", ds.NewStrVal(k))
+			if r, err = getVal(expr); err == nil {
+				return r, nil
+			}
+			return ds.NewIntVal(0), err
+		}
+	}
+
+	if expr, exists := t.Commands.St.Show.ShowValueAs[k]; exists {
+		if r, err = getVal(expr); err == nil {
 			return r, nil
 		}
 	}
@@ -234,15 +263,18 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 	if expr, exists := t.Commands.St.Show.ShowValueAs["*"]; exists {
 		// 这里存入k是因为接下来模板可能会用到原始key，例如 loadRaw(name)
 		ctx.vm.StoreNameLocal("name", ds.NewStrVal(k))
-		r, _, err = ctx.EvalFString(expr, nil)
-		if err == nil {
+		if r, err = getVal(expr); err == nil {
 			return r, nil
 		}
 		return ds.NewIntVal(0), err
 	}
 
-	// 没有二次覆盖，读取真实值
-	return t.GetRealValue(ctx, k)
+	// 返回真实值，如果真实值不存在就补0
+	if v == nil && err == nil {
+		// 不存在的值，强行补0
+		return ds.NewIntVal(0), nil
+	}
+	return v, err
 }
 
 func (t *GameSystemTemplateV2) GetRealValueBase(ctx *MsgContext, k string) (*ds.VMValue, error) {

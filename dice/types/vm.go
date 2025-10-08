@@ -207,18 +207,25 @@ func newVM(mctx *MsgContext) *ds.Context {
 						ctx.StoreNameLocal("name", ds.NewStrVal(expr))
 					}
 				}
+				skip := false
 				if detailExpr != "" {
-					v, err := ctx.RunExpr("\x1e"+detailExpr+"\x1e", true)
+					v, err := ctx.RunExpr(detailExpr, true)
 					if v != nil {
 						details[index].Text = v.ToString()
 					}
 					if err != nil {
 						details[index].Text = err.Error()
 					}
+					if v == nil || v.TypeId == ds.VMTypeNull {
+						skip = true
+					}
 				}
-				// 如果存在且为空，那么很明显意图就是置空
-				if exists && detailExpr == "" {
-					details[index].Text = ""
+
+				if !skip {
+					// 如果存在且为空，那么很明显意图就是置空
+					if exists && detailExpr == "" {
+						details[index].Text = ""
+					}
 				}
 			}
 		}
