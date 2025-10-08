@@ -54,11 +54,10 @@ type Commands struct {
 
 // SetConfig set命令配置
 type SetConfig struct {
-	// DiceSides  int      `yaml:"diceSides"`  // 骰子面数
-	DiceSideExpr string   `yaml:"diceSideExpr"` // 骰子面数表达式
-	EnableTip    string   `yaml:"enableTip"`    // 启用提示
-	Keys         []string `yaml:"keys"`         // 可用于 .set xxx 的key
-	RelatedExt   []string `yaml:"relatedExt"`   // 关联扩展
+	DiceSidesExpr string   `yaml:"diceSides"`  // 骰子面数表达式
+	EnableTip     string   `yaml:"enableTip"`  // 启用提示
+	Keys          []string `yaml:"keys"`       // 可用于 .set xxx 的key
+	RelatedExt    []string `yaml:"relatedExt"` // 关联扩展
 }
 
 // SnConfig sn命令配置
@@ -247,8 +246,7 @@ func (t *GameSystemTemplateV2) GetShowValueAs(ctx *MsgContext, k string) (*ds.VM
 }
 
 func (t *GameSystemTemplateV2) GetRealValueBase(ctx *MsgContext, k string) (*ds.VMValue, error) {
-	// 跟 showas 一样，但是不采用showas而是返回实际值
-	// 显示本体
+	// 获取实际值
 	am := ctx.AttrsManager
 	curAttrs := lo.Must(am.Load(ctx.Group.GroupId, ctx.Player.UserId))
 	v, exists := curAttrs.Load(k)

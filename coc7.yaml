@@ -5,7 +5,7 @@ authors:
   - 月森优姬
   - 于言诺
 version: 1.0.0
-updatedTime: '20230214'
+updatedTime: '20251004'
 templateVer: '2.0'
 
 attrs: # 属性
@@ -239,7 +239,7 @@ alias: # 别名，所有数组中的别名，在读取和写入时将被替换�
 
 commands:
   set:
-    diceSideExpr: '100'
+    diceSides: '100'
     keys:
       - coc
       - coc7
@@ -264,6 +264,7 @@ commands:
       showValueAs:
         生命值: '{生命值}/{生命值上限}'
         魔法值: '{魔法值}/{魔法值上限}'
+        db: '{db}'
       showKeyAs:
         生命值: '生命'
 

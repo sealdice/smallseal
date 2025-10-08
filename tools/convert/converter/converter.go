@@ -154,9 +154,9 @@ func Convert(src *TemplateV1, overrideTemplateVer string) *Output {
 	}
 
 	if expr := strings.TrimSpace(src.SetConfig.DiceSidesExpr); expr != "" {
-		dst.Commands.Set.DiceSideExpr = expr
+		dst.Commands.Set.DiceSidesExpr = expr
 	} else if src.SetConfig.DiceSides != 0 {
-		dst.Commands.Set.DiceSideExpr = strconv.Itoa(src.SetConfig.DiceSides)
+		dst.Commands.Set.DiceSidesExpr = strconv.Itoa(src.SetConfig.DiceSides)
 	}
 
 	if len(dst.Commands.Set.Keys) == 0 {

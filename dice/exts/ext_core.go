@@ -773,7 +773,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 				text := "当前可用规则:\n"
 				idx := 1
 				ctx.Dice.GameSystemMapGet().Range(func(key string, tmpl *types.GameSystemTemplateV2) bool {
-					text += fmt.Sprintf("%2d. [%s] %s %s\n", idx, tmpl.Name, tmpl.FullName, tmpl.Commands.Set.DiceSideExpr)
+					text += fmt.Sprintf("%2d. [%s] %s %s\n", idx, tmpl.Name, tmpl.FullName, tmpl.Commands.Set.DiceSidesExpr)
 					idx++
 					return true
 				})
@@ -792,7 +792,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 					if isMatch {
 						ctx.Group.System = key
 						ctx.GameSystem = tmpl
-						ctx.Group.DiceSideExpr = tmpl.Commands.Set.DiceSideExpr
+						ctx.Group.DiceSideExpr = tmpl.Commands.Set.DiceSidesExpr
 						ctx.Group.UpdatedAtTime = time.Now().Unix()
 
 						extNames := []string{}
@@ -806,7 +806,7 @@ func RegisterBuiltinExtCore(dice types.DiceLike) {
 							}
 						}
 
-						ReplyToSender(ctx, msg, fmt.Sprintf("已切换至 %s(%s) 规则，默认骰子面数 %s，自动启用关联扩展: %s", tmpl.FullName, tmpl.Name, strings.ToUpper(tmpl.Commands.Set.DiceSideExpr), strings.Join(extNames, ", ")))
+						ReplyToSender(ctx, msg, fmt.Sprintf("已切换至 %s(%s) 规则，默认骰子面数 %s，自动启用关联扩展: %s", tmpl.FullName, tmpl.Name, strings.ToUpper(tmpl.Commands.Set.DiceSidesExpr), strings.Join(extNames, ", ")))
 						persistGroupState()
 						found = true
 						return false

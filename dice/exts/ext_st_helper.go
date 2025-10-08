@@ -185,11 +185,13 @@ func cmdStGetItemsForShow(mctx *types.MsgContext, tmpl *types.GameSystemTemplate
 
 			// 注: 使用 baseK 的原因是 k 可能会被showAs更改，例如dnd5e会将”运动“修改为“运动*“，以代表熟练，此时k不再匹配
 			v, err = tmpl.GetShowValueAs(mctx, baseK)
+
+			// NOTE: 注意，计算computed会引起 .st &手枪=1d3+1d5 这样的值被计算出来，但是像是 db 这样的值我们又希望不计算。在showValueAs里面写一下 db: {db} 可解决
 			// 这段可以用来获取实际值，用于一种情况，就是模板中未设定showAs，该value本身是个computed
-			if err == nil && v.TypeId == ds.VMTypeComputedValue {
-				v = v.ComputedExecute(mctx.GetVM(), nil)
-				err = mctx.GetVM().Error
-			}
+			// if err == nil && v.TypeId == ds.VMTypeComputedValue {
+			// 	v = v.ComputedExecute(mctx.GetVM(), nil)
+			// 	err = mctx.GetVM().Error
+			// }
 			if err != nil {
 				return nil, 0, errors.New("模板卡异常(value), 属性: " + k + "\n报错: " + err.Error())
 			}

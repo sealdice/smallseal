@@ -338,6 +338,16 @@ func TestCoc7StShowPickAndLimit(t *testing.T) {
 	require.Contains(t, replyLimit, "HIDDEN")
 }
 
+func TestCoc7StShowComputedExpression(t *testing.T) {
+	ctx, msg, stub := newCoc7TestContext(t)
+	cmd := getCmdStBase(CmdStOverrideInfo{})
+
+	executeStCommands(t, stub, ctx, msg, cmd, ".st &手枪=1d3+1d5")
+
+	_, reply := executeStCommand(t, stub, ctx, msg, ".st show 手枪", cmd)
+	require.Contains(t, reply, "手枪:&(1d3+1d5)")
+}
+
 func TestCoc7StShowAliasAndChinesePrefix(t *testing.T) {
 	ctx, msg, stub := newCoc7TestContext(t)
 	cmd := getCmdStBase(CmdStOverrideInfo{})
@@ -459,6 +469,191 @@ func TestCoc7StComplexExpressions(t *testing.T) {
 	require.Equal(t, int64(-1), attrIntValue(t, ctx, attrsItem, "测试测试3"))
 }
 
+func setupCoc7RaTest(t *testing.T) (*types.MsgContext, *types.Message, *stubDice, *types.CmdItemInfo) {
+	ctx, msg, stub := newCoc7TestContext(t)
+
+	RegisterBuiltinExtCoc7(stub)
+
+	ext, ok := stub.extensions["coc7"]
+	require.True(t, ok)
+
+	ctx.Group.ExtActive(ext)
+
+	cmd, ok := ext.CmdMap["ra"]
+	require.True(t, ok)
+
+	return ctx, msg, stub, cmd
+}
+
+func TestCoc7RaBonusDiceShorthand(t *testing.T) {
+	ctx, msg, stub, cmd := setupCoc7RaTest(t)
+
+	ctx.CommandInfo = nil
+	stub.replies = nil
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".rab力量50", cmd, "rc", "ra", "rah", "rch")
+	require.NotEmpty(t, reply)
+
+	info := ctx.CommandInfo
+	require.NotNil(t, info)
+
+	itemsAny, ok := info["items"]
+	require.True(t, ok)
+
+	items, ok := itemsAny.([]interface{})
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
+
+	expr1, ok := item["expr1"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr1)
+	require.Equal(t, "b", expr1)
+
+	expr2, ok := item["expr2"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr2)
+	require.Equal(t, "力量50", expr2)
+}
+
+func TestCoc7RaMultipleBonusDiceShorthand(t *testing.T) {
+	ctx, msg, stub, cmd := setupCoc7RaTest(t)
+
+	ctx.CommandInfo = nil
+	stub.replies = nil
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".rab3力量50", cmd, "rc", "ra", "rah", "rch")
+	require.NotEmpty(t, reply)
+
+	info := ctx.CommandInfo
+	require.NotNil(t, info)
+
+	itemsAny, ok := info["items"]
+	require.True(t, ok)
+
+	items, ok := itemsAny.([]interface{})
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
+
+	expr1, ok := item["expr1"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr1)
+	require.Equal(t, "b3", expr1)
+
+	expr2, ok := item["expr2"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr2)
+	require.Equal(t, "力量50", expr2)
+}
+
+func TestCoc7RaInlineBonusDiceParenthesis(t *testing.T) {
+	ctx, msg, stub, cmd := setupCoc7RaTest(t)
+
+	ctx.CommandInfo = nil
+	stub.replies = nil
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".ra b3(1)50", cmd, "rc", "ra", "rah", "rch")
+	require.NotEmpty(t, reply)
+
+	info := ctx.CommandInfo
+	require.NotNil(t, info)
+
+	itemsAny, ok := info["items"]
+	require.True(t, ok)
+
+	items, ok := itemsAny.([]interface{})
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
+
+	expr1, ok := item["expr1"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr1)
+
+	expr2, ok := item["expr2"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr2)
+
+	require.Equal(t, "b3", expr1)
+
+}
+
+func TestCoc7RaInlineBonusDiceShortcutParenthesis(t *testing.T) {
+	ctx, msg, stub, cmd := setupCoc7RaTest(t)
+
+	ctx.CommandInfo = nil
+	stub.replies = nil
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".rab3(1)50", cmd, "rc", "ra", "rah", "rch")
+	require.NotEmpty(t, reply)
+
+	info := ctx.CommandInfo
+	require.NotNil(t, info)
+
+	itemsAny, ok := info["items"]
+	require.True(t, ok)
+
+	items, ok := itemsAny.([]interface{})
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
+
+	expr1, ok := item["expr1"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr1)
+
+	expr2, ok := item["expr2"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr2)
+
+	require.Equal(t, "b3", expr1)
+
+}
+
+func TestCoc7RaParenthesisArgument(t *testing.T) {
+	ctx, msg, stub, cmd := setupCoc7RaTest(t)
+
+	ctx.CommandInfo = nil
+	stub.replies = nil
+
+	result, reply := executeCommandWith(t, stub, ctx, msg, ".ra(1)50", cmd, "rc", "ra", "rah", "rch")
+
+	require.True(t, result.Matched)
+	require.True(t, result.Solved)
+	require.NotEmpty(t, reply)
+
+	info := ctx.CommandInfo
+	require.NotNil(t, info)
+
+	itemsAny, ok := info["items"]
+	require.True(t, ok)
+
+	items, ok := itemsAny.([]interface{})
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]interface{})
+	require.True(t, ok)
+
+	expr1, ok := item["expr1"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr1)
+	require.Equal(t, "(1)", expr1)
+
+	expr2, ok := item["expr2"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, expr2)
+	require.Equal(t, "50", expr2)
+}
 func TestCoc7SanCheckPersistsToAttributes(t *testing.T) {
 	ctx, msg, stub := newCoc7TestContext(t)
 
