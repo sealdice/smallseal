@@ -2,7 +2,6 @@ package exts
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -148,8 +147,10 @@ func minimalTextMap() types.TextTemplateWithWeightDict {
 func newCoc7TestContext(t *testing.T) (*types.MsgContext, *types.Message, *stubDice) {
 	t.Helper()
 
-	tmplPath := filepath.Join("..", "..", "coc7.yaml")
-	tmpl, err := types.LoadGameSystemTemplate(tmplPath)
+	asset, ok := BuiltinGameSystemTemplateAsset("coc7.yaml")
+	require.True(t, ok)
+
+	tmpl, err := types.LoadGameSystemTemplateFromData(asset.Data, asset.Filename)
 	require.NoError(t, err)
 
 	stub := newStubDice(tmpl)

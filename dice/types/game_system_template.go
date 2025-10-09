@@ -92,18 +92,31 @@ func LoadGameSystemTemplate(filename string) (*GameSystemTemplateV2, error) {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
+	return loadGameSystemTemplate(data, strings.ToLower(filepath.Ext(filename)))
+}
+
+// LoadGameSystemTemplateFromData loads a game system template from in-memory data.
+func LoadGameSystemTemplateFromData(data []byte, filenameOrExt string) (*GameSystemTemplateV2, error) {
+	ext := strings.ToLower(filenameOrExt)
+	if extWithDot := strings.ToLower(filepath.Ext(filenameOrExt)); extWithDot != "" {
+		ext = extWithDot
+	} else if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+
+	return loadGameSystemTemplate(data, ext)
+}
+
+func loadGameSystemTemplate(data []byte, ext string) (*GameSystemTemplateV2, error) {
 	var template GameSystemTemplateV2
-	ext := strings.ToLower(filepath.Ext(filename))
 
 	switch ext {
 	case ".yaml", ".yml":
-		err = yaml.Unmarshal(data, &template)
-		if err != nil {
+		if err := yaml.Unmarshal(data, &template); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
 		}
 	case ".json":
-		err = json.Unmarshal(data, &template)
-		if err != nil {
+		if err := json.Unmarshal(data, &template); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 		}
 	default:

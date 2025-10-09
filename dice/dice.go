@@ -49,11 +49,8 @@ func NewDice() *Dice {
 	d.attrsManager.Init()
 	d.Config.CommandPrefix = []string{".", "。"}
 
-	for _, tmplPath := range []string{
-		"./coc7.yaml",
-		"./dnd5e.yaml",
-	} {
-		gs, err := types.LoadGameSystemTemplate(tmplPath)
+	for _, asset := range exts.BuiltinGameSystemTemplateAssets() {
+		gs, err := types.LoadGameSystemTemplateFromData(asset.Data, asset.Filename)
 		if err != nil {
 			panic(err)
 		}

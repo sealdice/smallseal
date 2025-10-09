@@ -1,7 +1,6 @@
 package exts
 
 import (
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -17,8 +16,10 @@ import (
 func newDnd5eTemplate(t *testing.T) *types.GameSystemTemplateV2 {
 	t.Helper()
 
-	path := filepath.Join("..", "..", "dnd5e.yaml")
-	tmpl, err := types.LoadGameSystemTemplate(path)
+	asset, ok := BuiltinGameSystemTemplateAsset("dnd5e.yaml")
+	require.True(t, ok)
+
+	tmpl, err := types.LoadGameSystemTemplateFromData(asset.Data, asset.Filename)
 	require.NoError(t, err)
 	return tmpl
 }
