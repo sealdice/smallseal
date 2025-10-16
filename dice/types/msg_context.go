@@ -99,7 +99,36 @@ func (ctx *MsgContext) EvalBase(expr string, flags *ds.RollConfig) (*ds.VMValue,
 	vm := ctx.GetVM()
 	prevConfig := vm.Config
 	if flags != nil {
-		vm.Config = *flags
+		cfg := prevConfig
+		cfg.EnableDiceWoD = flags.EnableDiceWoD
+		cfg.EnableDiceCoC = flags.EnableDiceCoC
+		cfg.EnableDiceFate = flags.EnableDiceFate
+		cfg.EnableDiceDoubleCross = flags.EnableDiceDoubleCross
+		cfg.DisableBitwiseOp = flags.DisableBitwiseOp
+		cfg.DisableStmts = flags.DisableStmts
+		cfg.DisableNDice = flags.DisableNDice
+		cfg.ParseExprLimit = flags.ParseExprLimit
+		cfg.OpCountLimit = flags.OpCountLimit
+		cfg.DefaultDiceSideExpr = flags.DefaultDiceSideExpr
+		cfg.PrintBytecode = flags.PrintBytecode
+		cfg.IgnoreDiv0 = flags.IgnoreDiv0
+		cfg.DiceMinMode = flags.DiceMinMode
+		cfg.DiceMaxMode = flags.DiceMaxMode
+
+		if flags.HookValueStore != nil {
+			cfg.HookValueStore = flags.HookValueStore
+		}
+		if flags.HookValueLoadPre != nil {
+			cfg.HookValueLoadPre = flags.HookValueLoadPre
+		}
+		if flags.HookValueLoadPost != nil {
+			cfg.HookValueLoadPost = flags.HookValueLoadPost
+		}
+		if flags.CallbackSt != nil {
+			cfg.CallbackSt = flags.CallbackSt
+		}
+
+		vm.Config = cfg
 	}
 	err := vm.Run(expr)
 	vm.Config = prevConfig

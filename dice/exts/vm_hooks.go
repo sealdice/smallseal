@@ -2,6 +2,7 @@ package exts
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -74,7 +75,17 @@ func tryMergeBuff(ctx *MsgContext, vm *ds.Context, varname string, curVal *ds.VM
 		return curVal, false
 	}
 
-	buffName := "$buff_" + varname
+	tmpl := ctx.GameSystem
+	if tmpl == nil && ctx.Group != nil {
+		tmpl = ctx.GetCharTemplate()
+	}
+
+	buffKey := varname
+	if tmpl != nil && !strings.HasPrefix(varname, "$") {
+		buffKey = tmpl.GetAlias(varname)
+	}
+
+	buffName := "$buff_" + buffKey
 	buffVal, exists := attrs.Load(buffName)
 	if !exists || buffVal == nil {
 		return curVal, false
@@ -96,6 +107,13 @@ func tryMergeBuff(ctx *MsgContext, vm *ds.Context, varname string, curVal *ds.VM
 				return curVal, false
 			}
 
+			if cdCur.Attrs == nil {
+				cdCur.Attrs = &ds.ValueMap{}
+			}
+			if cdBuff.Attrs == nil {
+				return curVal, false
+			}
+
 			cdBuff.Attrs.Range(func(key string, value *ds.VMValue) bool {
 				if existing, ok := cdCur.Attrs.Load(key); ok {
 					if merged := existing.OpAdd(vm, value); merged != nil {
@@ -113,6 +131,45 @@ func tryMergeBuff(ctx *MsgContext, vm *ds.Context, varname string, curVal *ds.VM
 			return newVal, true
 		}
 		return curVal, false
+	}
+
+	if buffVal.TypeId == ds.VMTypeComputedValue && curVal.TypeId == ds.VMTypeInt {
+		cdBuff, okBuff := buffVal.ReadComputed()
+		if okBuff && cdBuff.Attrs != nil {
+			result := curVal.Clone()
+
+			if baseBuff, ok := cdBuff.Attrs.Load("base"); ok && baseBuff != nil {
+				if merged := result.OpAdd(vm, baseBuff); merged != nil {
+					vm.Error = nil
+					result = merged
+				} else {
+					vm.Error = nil
+				}
+			}
+
+			if factorBuff, ok := cdBuff.Attrs.Load("factor"); ok && factorBuff != nil && tmpl != nil {
+				if pbVal, errPb := tmpl.GetRealValue(ctx, "熟练"); errPb == nil && pbVal != nil && pbVal.TypeId == ds.VMTypeInt {
+					if factor, ok := factorBuff.ReadFloat(); ok {
+						bonus := int64(math.Floor(float64(pbVal.MustReadInt()) * factor))
+						if bonus != 0 {
+							if merged := result.OpAdd(vm, ds.NewIntVal(ds.IntType(bonus))); merged != nil {
+								vm.Error = nil
+								result = merged
+							} else {
+								vm.Error = nil
+							}
+						}
+					}
+				}
+			}
+
+			if detail != nil {
+				detail.Text += fmt.Sprintf("%s+buff%s", curVal.ToString(), buffVal.ToString())
+				detail.Ret = result
+			}
+
+			return result, true
+		}
 	}
 
 	if detail != nil {
@@ -143,8 +200,24 @@ func setDndReadForVM(ctx *MsgContext, rcMode bool) {
 
 	var skip bool
 	loadBuff := true
+	useHook := true
 
 	vm.Config.HookValueLoadPost = func(inner *ds.Context, varname string, curVal *ds.VMValue, doCompute func(*ds.VMValue) *ds.VMValue, detail *ds.BufferSpan) *ds.VMValue {
+		if !useHook {
+			return doCompute(curVal)
+		}
+
+		if strings.HasPrefix(varname, "$org_") {
+			realName := strings.TrimPrefix(varname, "$org_")
+			useHook = false
+			prevLoadBuff := loadBuff
+			loadBuff = false
+			value := inner.LoadName(realName, true, false)
+			loadBuff = prevLoadBuff
+			useHook = true
+			return value
+		}
+
 		tmpl := ctx.GameSystem
 		if tmpl == nil && ctx.Group != nil {
 			tmpl = ctx.GetCharTemplate()

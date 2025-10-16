@@ -233,3 +233,104 @@ func TestDnd5eRaAbilityDisplaysModifierDetail(t *testing.T) {
 	require.NotEmpty(t, reply)
 	require.Containsf(t, reply, "+ 4[力量调整值4]", "expected ability check detail to include ability modifier detail, got %q", reply)
 }
+
+func TestDnd5eBuffAffectsAbilityAndSkill(t *testing.T) {
+	ctx, msg, stub, stCmd := newDnd5eTestContext(t)
+
+	ext, ok := stub.extensions["dnd5e"]
+	require.True(t, ok, "dnd5e extension should be registered")
+
+	cmdBuff, ok := ext.CmdMap["buff"]
+	require.True(t, ok, "dnd5e extension should provide buff command")
+
+	strength := "\u529b\u91cf"
+	athletics := "\u8fd0\u52a8"
+	strengthMod := "\u529b\u91cf\u8c03\u6574\u503c"
+
+	executeStCommands(t, stub, ctx, msg, stCmd, ".st "+strength+":10")
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".buff "+strength+":4", cmdBuff, "buff", "dbuff")
+
+	attrsItem, err := ctx.AttrsManager.Load(ctx.Group.GroupId, ctx.Player.UserId)
+	require.NoError(t, err)
+	abilityBuff, exists := attrsItem.Load("$buff_" + strength)
+	require.True(t, exists, "expected strength buff to be stored")
+	require.Equal(t, ds.VMTypeInt, abilityBuff.TypeId, "strength buff should store an integer value")
+
+	setDndReadForVM(ctx, false)
+
+	ability := ctx.Eval(strength, nil)
+	require.NotNil(t, ability, "expected strength value to be readable")
+	require.EqualValues(t, 14, ability.MustReadInt(), "buff should increase ability score")
+
+	modifier := ctx.Eval(strengthMod, nil)
+	require.NotNil(t, modifier, "expected strength modifier to be readable")
+	require.EqualValues(t, 2, modifier.MustReadInt(), "buff should affect ability modifier")
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".buff "+athletics+":3", cmdBuff, "buff", "dbuff")
+
+	skillBuff, exists := attrsItem.Load("$buff_" + athletics)
+	require.True(t, exists, "expected athletics buff to be stored")
+	require.Equal(t, ds.VMTypeComputedValue, skillBuff.TypeId, "athletics buff should store computed value")
+
+	skill := ctx.Eval(athletics, nil)
+	require.NotNil(t, skill, "expected athletics value to be readable")
+	require.EqualValues(t, 5, skill.MustReadInt(), "buff should affect skill totals")
+}
+
+func TestDnd5eBuffAffectsRollCommand(t *testing.T) {
+	ctx, msg, stub, stCmd := newDnd5eTestContext(t)
+
+	coreExt, ok := stub.extensions["core"]
+	require.True(t, ok)
+
+	setCmd, ok := coreExt.CmdMap["set"]
+	require.True(t, ok)
+
+	rollCmd, ok := coreExt.CmdMap["roll"]
+	require.True(t, ok)
+
+	ext, ok := stub.extensions["dnd5e"]
+	require.True(t, ok)
+
+	buffCmd, ok := ext.CmdMap["buff"]
+	require.True(t, ok)
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".set dnd", setCmd, "set")
+	executeStCommands(t, stub, ctx, msg, stCmd, ".st 力量:4")
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".buff 力量:4", buffCmd, "buff", "dbuff")
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".r 力量+1", rollCmd, "r", "ra", "rh", "rd")
+	require.NotEmpty(t, reply)
+	require.Contains(t, reply, "=9", "expected buffed roll result to include total 9")
+	require.Contains(t, reply, "力量+1=8", "expected buffed strength value to be 8, got %q", reply)
+	require.Contains(t, reply, "buff4", "expected buff contribution in detail, got %q", reply)
+}
+
+func TestDnd5eStShowDisplaysBaseAndBuff(t *testing.T) {
+	ctx, msg, stub, stCmd := newDnd5eTestContext(t)
+
+	coreExt, ok := stub.extensions["core"]
+	require.True(t, ok)
+
+	setCmd, ok := coreExt.CmdMap["set"]
+	require.True(t, ok)
+
+	ext, ok := stub.extensions["dnd5e"]
+	require.True(t, ok)
+
+	buffCmd, ok := ext.CmdMap["buff"]
+	require.True(t, ok)
+
+	stCmdExt, ok := ext.CmdMap["st"]
+	require.True(t, ok)
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".set dnd", setCmd, "set")
+	executeStCommands(t, stub, ctx, msg, stCmd, ".st 力量:4")
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".buff 力量:4", buffCmd, "buff", "dbuff")
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".st show", stCmdExt, "st")
+	require.NotEmpty(t, reply)
+	require.Contains(t, reply, "力量:8[4]", "expected show output to include buffed and base values, got %q", reply)
+}
