@@ -279,26 +279,37 @@ func cmdStGetItemsForExport(mctx *types.MsgContext, tmpl *types.GameSystemTempla
 func cmdStValueMod(mctx *types.MsgContext, tmpl *types.GameSystemTemplateV2, attrs *attrs.AttributesItem, commandInfo map[string]any, i *stSetOrModInfoItem, cmdArgs *types.CmdArgs, stInfo *CmdStOverrideInfo) {
 	// 获取当前值
 	vm := mctx.GetVM()
-	curVal, _ := attrs.Load(i.name)
-	if curVal == nil {
-		curVal, _, _, _ = tmpl.GetDefaultValue(i.name)
-	}
-	if curVal == nil {
-		curVal = ds.NewIntVal(0)
+	originalName := i.name
+
+	loadCurrent := func(name string) (*ds.VMValue, bool) {
+		cur, _ := attrs.Load(name)
+		if cur == nil {
+			cur, _, _, _ = tmpl.GetDefaultValue(name)
+		}
+		if cur == nil {
+			cur = ds.NewIntVal(0)
+		}
+
+		isSetNew := true
+		if cur.TypeId == ds.VMTypeComputedValue {
+			cd, _ := cur.ReadComputed()
+			// dnd5eרָזנ
+			if v, ok := cd.Attrs.Load("base"); ok {
+				cur = v
+				isSetNew = false
+			}
+		}
+		return cur, isSetNew
 	}
 
-	isSetNew := true
-	if curVal.TypeId == ds.VMTypeComputedValue {
-		cd, _ := curVal.ReadComputed()
-		// dnd5e专属
-		if v, ok := cd.Attrs.Load("base"); ok {
-			curVal = v
-			isSetNew = false
-		}
-	}
+	curVal, isSetNew := loadCurrent(originalName)
 
 	if stInfo.ToMod != nil {
 		stInfo.ToMod(mctx, cmdArgs, i, attrs, tmpl)
+	}
+
+	if i.name != originalName {
+		curVal, isSetNew = loadCurrent(i.name)
 	}
 
 	// 进行变更
@@ -325,12 +336,25 @@ func cmdStValueMod(mctx *types.MsgContext, tmpl *types.GameSystemTemplateV2, att
 	}
 
 	// 指令信息
+	displayName := i.name
+	if i.displayName != "" {
+		displayName = i.displayName
+	}
+	displayOld := theOldValue
+	if i.displayOld != nil {
+		displayOld = i.displayOld
+	}
+	displayNew := theNewValue
+	if i.displayNew != nil {
+		displayNew = i.displayNew
+	}
+
 	commandInfo["items"] = append(commandInfo["items"].([]any), map[string]any{
 		"type":    "mod",
-		"attr":    i.name,
+		"attr":    displayName,
 		"modExpr": i.expr,
-		"valOld":  theOldValue,
-		"valNew":  theNewValue,
+		"valOld":  displayOld,
+		"valNew":  displayNew,
 		"isInc":   signText == "增加", // 增加还是扣除
 		"op":      i.op,
 	})
@@ -339,12 +363,13 @@ func cmdStValueMod(mctx *types.MsgContext, tmpl *types.GameSystemTemplateV2, att
 		attrs.Store(i.name, theNewValue)
 	}
 
-	VarSetValueStr(mctx, "$t属性", i.name)
-	VarSetValue(mctx, "$t旧值", theOldValue)
-	VarSetValue(mctx, "$t新值", theNewValue)
+	VarSetValueStr(mctx, "$t属性", displayName)
+	VarSetValue(mctx, "$t旧值", displayOld)
+	VarSetValue(mctx, "$t新值", displayNew)
 	VarSetValue(mctx, "$t变化量", theModValue)
 	VarSetValueStr(mctx, "$t增加或扣除", signText)
 	VarSetValueStr(mctx, "$t表达式文本", i.expr)
+	VarSetValueStr(mctx, "$t表达式", i.expr)
 }
 
 type stSetOrModInfoItem struct {
@@ -354,6 +379,10 @@ type stSetOrModInfoItem struct {
 	op           string
 	expr         string
 	appendedText string
+
+	displayName string
+	displayOld  *ds.VMValue
+	displayNew  *ds.VMValue
 }
 
 func cmdStReadOrMod(ctx *types.MsgContext, tmpl *types.GameSystemTemplateV2, text string) (r *ds.VMValue, toSetItems []*stSetOrModInfoItem, toModItems []*stSetOrModInfoItem, err error) {

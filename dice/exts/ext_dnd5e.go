@@ -178,9 +178,9 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 					} else {
 						return fmt.Sprintf("%s*%s:%s", key, factor.ToRepr(), base.ToRepr())
 					}
-				} else {
-					return fmt.Sprintf("%s:%s", key, base.ToRepr())
 				}
+			} else {
+				return fmt.Sprintf("%s:%s", key, base.ToRepr())
 			}
 		}
 
@@ -256,17 +256,40 @@ func RegisterBuiltinExtDnd5e(dice types.DiceLike) {
 				vHpBuffVal := hpBuff.MustReadInt()
 				// 正盾并且扣血才做反馈
 				if vHpBuffVal > 0 && i.op == "-" {
-					val := vHpBuffVal - i.value.MustReadInt()
-					if val >= 0 {
-						// 有充足的盾，扣掉，当前伤害改为0
-						attrs.Store("$buff_hp", ds.NewIntVal(val))
-						i.value = ds.NewIntVal(0)
-					} else {
-						// 没有充足的盾，盾扣到0，剩下的继续造成伤害
-						attrs.Delete("$buff_hp")
-						// 传入 -val, 因为 op 是减法，不然会变成加血
-						i.value = ds.NewIntVal(-val)
+					damage := i.value.MustReadInt()
+					var actualHp ds.IntType
+					if hpVal, _ := attrs.Load("hp"); hpVal != nil && hpVal.TypeId == ds.VMTypeInt {
+						actualHp, _ = hpVal.ReadInt()
 					}
+
+					oldTotal := actualHp + vHpBuffVal
+					var newTotal ds.IntType
+
+					if damage <= vHpBuffVal {
+						newBuff := vHpBuffVal - damage
+						if newBuff > 0 {
+							attrs.Store("$buff_hp", ds.NewIntVal(newBuff))
+						} else {
+							attrs.Delete("$buff_hp")
+						}
+						i.value = ds.NewIntVal(0)
+						newTotal = actualHp + newBuff
+					} else {
+						attrs.Delete("$buff_hp")
+						remain := damage - vHpBuffVal
+						if remain < 0 {
+							remain = 0
+						}
+						i.value = ds.NewIntVal(remain)
+						newTotal = actualHp - remain
+						if newTotal < 0 {
+							newTotal = 0
+						}
+					}
+
+					i.displayName = attrName
+					i.displayOld = ds.NewIntVal(oldTotal)
+					i.displayNew = ds.NewIntVal(newTotal)
 				}
 			}
 

@@ -334,3 +334,59 @@ func TestDnd5eStShowDisplaysBaseAndBuff(t *testing.T) {
 	require.NotEmpty(t, reply)
 	require.Contains(t, reply, "力量:8[4]", "expected show output to include buffed and base values, got %q", reply)
 }
+
+func TestDnd5eHpShowAndBuffSequence(t *testing.T) {
+	ctx, msg, stub, stCmd := newDnd5eTestContext(t)
+
+	ext, ok := stub.extensions["dnd5e"]
+	require.True(t, ok, "dnd5e extension should be registered")
+
+	coreExt, ok := stub.extensions["core"]
+	require.True(t, ok, "core extension should be registered")
+
+	setCmd, ok := coreExt.CmdMap["set"]
+	require.True(t, ok, "core extension should provide set command")
+
+	rollCmd, ok := coreExt.CmdMap["roll"]
+	require.True(t, ok, "core extension should provide roll command")
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".set dnd", setCmd, "set")
+
+	buffCmd, ok := ext.CmdMap["buff"]
+	require.True(t, ok, "dnd5e extension should provide buff command")
+
+	executeStCommands(t, stub, ctx, msg, stCmd, ".st hp4")
+
+	_, showReply := executeCommandWith(t, stub, ctx, msg, ".st show hp", stCmd, "st")
+	require.Containsf(t, showReply, "hp:4/0[4]", "expected base HP display before buff, got %q", showReply)
+
+	_, buffReply := executeCommandWith(t, stub, ctx, msg, ".buff hp+4", buffCmd, "buff", "dbuff")
+	require.NotEmpty(t, buffReply, "expected buff command to reply")
+	require.Containsf(t, buffReply, "$buff_hp: 0->4", "expected buff reply to show 0->4 change, got %q", buffReply)
+
+	attrsItem, err := ctx.AttrsManager.Load(ctx.Group.GroupId, ctx.Player.UserId)
+	require.NoError(t, err)
+	buffVal, exists := attrsItem.Load("$buff_hp")
+	require.True(t, exists, "expected hp buff attribute to be stored")
+	require.EqualValues(t, 4, buffVal.MustReadInt(), "expected hp buff to be 4")
+
+	_, rollBefore := executeCommandWith(t, stub, ctx, msg, ".r hp+1", rollCmd, "r", "ra", "rh", "rd")
+	require.NotEmpty(t, rollBefore)
+	require.Containsf(t, rollBefore, "=9", "expected hp+1 roll to total 9 before damage, got %q", rollBefore)
+
+	_, damageReply := executeCommandWith(t, stub, ctx, msg, ".st hp-1", stCmd, "st")
+	require.NotEmpty(t, damageReply, "expected hp deduction reply")
+	require.Containsf(t, damageReply, "hp: 8->7", "expected deduction detail to show hp:8->7, got %q", damageReply)
+	require.NotContainsf(t, damageReply, "$buff_hp", "expected output to avoid exposing $buff_hp attribute, got %q", damageReply)
+
+	buffVal, exists = attrsItem.Load("$buff_hp")
+	require.True(t, exists, "expected hp buff attribute to persist after deduction")
+	require.EqualValues(t, 3, buffVal.MustReadInt(), "expected hp buff to decrease to 3 after deduction")
+
+	_, showAfter := executeCommandWith(t, stub, ctx, msg, ".st show hp", stCmd, "st")
+	require.Containsf(t, showAfter, "hp:7/0[4]", "expected hp show to apply buff totals, got %q", showAfter)
+
+	_, rollAfter := executeCommandWith(t, stub, ctx, msg, ".r hp+1", rollCmd, "r", "ra", "rh", "rd")
+	require.NotEmpty(t, rollAfter)
+	require.Containsf(t, rollAfter, "=8", "expected hp+1 roll to total 8 after damage, got %q", rollAfter)
+}
