@@ -390,3 +390,23 @@ func TestDnd5eHpShowAndBuffSequence(t *testing.T) {
 	require.NotEmpty(t, rollAfter)
 	require.Containsf(t, rollAfter, "=8", "expected hp+1 roll to total 8 after damage, got %q", rollAfter)
 }
+
+func TestDnd5eRollAfterSequentialCommands(t *testing.T) {
+	// 注意，这个测试有点不对，因为构造的ctx是理想的，实际环境中.r并没有加载到dnd5e的buff
+	ctx, msg, stub, stCmd := newDnd5eTestContext(t)
+
+	coreExt := stub.extensions["core"]
+	setCmd := coreExt.CmdMap["set"]
+	rollCmd := coreExt.CmdMap["roll"]
+
+	dndExt := stub.extensions["dnd5e"]
+	buffCmd := dndExt.CmdMap["buff"]
+
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".set dnd", setCmd, "set")
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".st hp4", stCmd, "st")
+	_, _ = executeCommandWith(t, stub, ctx, msg, ".buff hp4", buffCmd, "buff", "dbuff")
+
+	_, reply := executeCommandWith(t, stub, ctx, msg, ".r hp+1", rollCmd, "r", "ra", "rh", "rd")
+	require.NotEmpty(t, reply, "expected roll command to produce output")
+	require.Contains(t, reply, "=9", "expected hp+1 to total 9 with buff applied, got %q", reply)
+}

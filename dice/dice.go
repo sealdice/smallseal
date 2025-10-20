@@ -68,7 +68,7 @@ func (d *Dice) getNextCommandID() int64 {
 	return d.curCommandID.Add(1)
 }
 
-func (d *Dice) Execute(adapterId string, msg *types.Message) {
+func (d *Dice) Execute(adapterId string, msg *types.Message) (solved bool) {
 	if msg == nil {
 		return
 	}
@@ -173,7 +173,6 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 		exts.ReplyToSender(mctx, msg, helpText)
 	}
 
-	solved := false
 	allowWhenInactive := func(cmd *types.CmdItemInfo) bool {
 		if cmd == nil {
 			return false
@@ -216,6 +215,8 @@ func (d *Dice) Execute(adapterId string, msg *types.Message) {
 			}
 		}
 	}
+
+	return solved
 }
 
 func (d *Dice) MasterAdd(uid string) {
